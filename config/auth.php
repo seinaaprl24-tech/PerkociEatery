@@ -75,6 +75,27 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Kredensial Login Staf
+    |--------------------------------------------------------------------------
+    |
+    | Sesuai ERD, tabel "users" memakai kolom "username" sebagai identitas
+    | login (kolom email tidak ada di tabel users). Karena itu kredensial
+    | yang dikirim ke guard selalu berformat:
+    |
+    |     Auth::attempt([
+    |         'username' => $request->input('username'),
+    |         'password' => $request->input('password'),
+    |     ]);
+    |
+    | Customer tidak pernah memakai guard ini, alur customer berjalan lewat
+    | validasi QR Code meja tanpa login.
+    |
+    */
+
+    'credential_field' => User::AUTH_CREDENTIAL_FIELD,
+
+    /*
+    |--------------------------------------------------------------------------
     | Resetting Passwords
     |--------------------------------------------------------------------------
     |

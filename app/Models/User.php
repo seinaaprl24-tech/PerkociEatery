@@ -2,16 +2,25 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
+
+    /**
+     * Kolom yang dipakai sebagai identitas login staf.
+     * Sesuai ERD, staf melakukan login memakai "username" (bukan email).
+     */
+    public const AUTH_CREDENTIAL_FIELD = 'username';
+
+    protected $primaryKey = 'id_user';
+
+    public $incrementing = true;
+
+    protected $keyType = 'int';
 
     /**
      * The attributes that are mass assignable.
@@ -19,9 +28,10 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
-        'name',
-        'email',
+        'nama',
+        'username',
         'password',
+        'role',
     ];
 
     /**
@@ -42,8 +52,30 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function transaksi()
+    {
+        return $this->hasMany(Transaksi::class, 'id_user', 'id_user');
+    }
+
+    public function pemasukan()
+    {
+        return $this->hasMany(Pemasukan::class, 'id_user', 'id_user');
+    }
+
+    public function pengeluaran()
+    {
+        return $this->hasMany(Pengeluaran::class, 'id_user', 'id_user');
+    }
+
+    /**
+     * Cek apakah pengguna memiliki salah satu role yang diberikan.
+     */
+    public function hasRole(string ...$roles): bool
+    {
+        return in_array($this->role, $roles, true);
     }
 }
