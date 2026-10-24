@@ -18,9 +18,6 @@ use Illuminate\Validation\ValidationException;
 
 class PesananController extends Controller
 {
-    /**
-     * Menampilkan daftar pesanan dengan pagination.
-     */
     public function index(): AnonymousResourceCollection
     {
         $pesanan = Pesanan::with(['meja', 'detailPesanan.produk'])
@@ -30,17 +27,11 @@ class PesananController extends Controller
         return PesananResource::collection($pesanan);
     }
 
-    /**
-     * Menampilkan detail pesanan lengkap.
-     */
     public function show(Pesanan $pesanan): PesananResource
     {
         return new PesananResource($pesanan->load(['meja', 'detailPesanan.produk']));
     }
 
-    /**
-     * Membuat pesanan baru.
-     */
     public function store(StorePesananRequest $request): JsonResponse
     {
         $validated = $request->validated();
@@ -76,7 +67,7 @@ class PesananController extends Controller
 
                 $subtotal = $item['harga_satuan'] * $item['jumlah'];
 
-                DetailPesanan::create([
+                $detailData = [
                     'id_pesanan' => $pesanan->id_pesanan,
                     'id_produk' => $item['id_produk'],
                     'jumlah' => $item['jumlah'],
@@ -86,7 +77,13 @@ class PesananController extends Controller
                     'gula' => $item['gula'] ?? null,
                     'es' => $item['es'] ?? null,
                     'catatan' => $item['catatan'] ?? null,
-                ]);
+                ];
+
+                if (array_key_exists('customisasi', $item)) {
+                    $detailData['customisasi'] = $item['customisasi'];
+                }
+
+                DetailPesanan::create($detailData);
             }
 
             return $pesanan;
@@ -97,9 +94,6 @@ class PesananController extends Controller
             ->setStatusCode(201);
     }
 
-    /**
-     * Update status pesanan.
-     */
     public function update_status(Request $request, Pesanan $pesanan): PesananResource
     {
         $validated = $request->validate([
@@ -113,9 +107,6 @@ class PesananController extends Controller
         return new PesananResource($pesanan->load(['meja', 'detailPesanan.produk']));
     }
 
-    /**
-     * Batalkan/hapus pesanan dan kembalikan stok.
-     */
     public function destroy(Pesanan $pesanan): JsonResponse
     {
         DB::transaction(function () use ($pesanan) {
@@ -146,11 +137,48 @@ class PesananController extends Controller
         ]);
     }
 
+    public function cetakStruk($id): JsonResponse
+    {
+        $pesanan = Pesanan::with(['meja', 'detailPesanan.produk', 'pembayaran'])
+            ->findOrFail($id);
+
+        $resource = (new PesananResource($pesanan))->resolve();
+
+        $items = [];
+        if (isset($resource['detail_pesanan'])) {
+            $items = $resource['detail_pesanan'];
+        } elseif (isset($resource['items'])) {
+            $items = $resource['items'];
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'info_coffee_shop' => [
+                    'nama' => 'PerkociEatery',
+                    'alamat' => '-',
+                    'telepon' => '-',
+                ],
+                'nomor_antrean' => $resource['nomor_antrean'] ?? $pesanan->nomor_antrean,
+                'nama_meja' => $resource['meja']['no_meja'] ?? null,
+                'meja' => $resource['meja'] ?? null,
+                'daftar_item' => $items,
+                'items' => $items,
+                'total_harga' => $resource['total_harga'] ?? (float) $pesanan->total_harga,
+                'metode_pembayaran' => $resource['pembayaran']['metode_pembayaran'] ?? $pesanan->pembayaran->metodePembayaran->nama_metode ?? null,
+                'kembalian' => $resource['pembayaran']['kembalian'] ?? $pesanan->pembayaran->kembalian ?? null,
+                'tanggal' => $resource['tanggal_pesan'] ?? $pesanan->tanggal_pesan,
+                'tanggal_pesan' => $resource['tanggal_pesan'] ?? $pesanan->tanggal_pesan,
+                'pembayaran' => $resource['pembayaran'] ?? null,
+            ],
+        ]);
+    }
+
     private function generateNomorAntrean(): string
     {
         $date = Carbon::now()->format('Ymd');
         $count = Pesanan::whereDate('tanggal_pesan', Carbon::now()->toDateString())->count() + 1;
 
-        return 'ANT-' . $date . '-' . str_pad((string) $count, 4, '0', STR_PAD_LEFT);
+        return 'ORD-' . $date . '-' . str_pad((string) $count, 3, '0', STR_PAD_LEFT);
     }
 }

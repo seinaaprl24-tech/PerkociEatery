@@ -8,13 +8,11 @@ use App\Models\Pesanan;
 use App\Models\Produk;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class LaporanController extends Controller
 {
-    /**
-     * Ringkasan data hari ini.
-     */
     public function getDailyStats(): JsonResponse
     {
         $today = Carbon::today();
@@ -51,9 +49,6 @@ class LaporanController extends Controller
         ]);
     }
 
-    /**
-     * 5 produk terlaris berdasarkan total qty terjual.
-     */
     public function getTopProducts(): JsonResponse
     {
         $topProducts = DetailPesanan::select(
@@ -77,9 +72,6 @@ class LaporanController extends Controller
         ]);
     }
 
-    /**
-     * Total pemasukan bulan berjalan.
-     */
     public function getMonthlyIncome(): JsonResponse
     {
         $startOfMonth = Carbon::now()->startOfMonth();
@@ -98,6 +90,44 @@ class LaporanController extends Controller
         return response()->json([
             'bulan' => Carbon::now()->format('Y-m'),
             'total_pemasukan' => (float) $totalPemasukan,
+        ]);
+    }
+
+    public function laporanPenjualan(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'start_date' => ['required', 'date'],
+            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
+        ]);
+
+        $start = Carbon::parse($validated['start_date'])->startOfDay();
+        $end = Carbon::parse($validated['end_date'])->endOfDay();
+
+        $totalTransaksi = Pesanan::whereBetween('tanggal_pesan', [$start, $end])
+            ->count();
+
+        $totalPendapatan = Pembayaran::whereBetween('tanggal_pembayaran', [$start, $end])
+            ->where('status_pembayaran', 'lunas')
+            ->sum('jumlah_bayar');
+
+        if ($totalPendapatan == 0) {
+            $totalPendapatan = Pesanan::whereBetween('tanggal_pesan', [$start, $end])
+                ->whereIn('status_pesanan', ['selesai', 'lunas'])
+                ->sum('total_harga');
+        }
+
+        $transaksi = Pesanan::with(['meja', 'detailPesanan.produk', 'pembayaran'])
+            ->whereBetween('tanggal_pesan', [$start, $end])
+            ->orderByDesc('tanggal_pesan')
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'start_date' => $start->toDateString(),
+            'end_date' => $end->toDateString(),
+            'total_transaksi' => $totalTransaksi,
+            'total_pendapatan' => (float) $totalPendapatan,
+            'data' => $transaksi,
         ]);
     }
 }
