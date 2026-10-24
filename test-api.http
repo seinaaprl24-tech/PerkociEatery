@@ -1,0 +1,27 @@
+### 1. Register User Baru (Admin)
+POST http://127.0.0.1:8000/api/register
+Content-Type: application/json
+Accept: application/json
+
+{
+  "nama": "Meliza",
+  "username": "mel_admin",
+  "password": "password123",
+  "password_confirmation": "password123",
+  "role": "admin"
+}
+
+### 2. Login User (Dapatkan Token)
+POST http://127.0.0.1:8000/api/login
+Content-Type: application/json
+Accept: application/json
+
+{
+  "username": "mel_admin",
+  "password": "password123"
+}
+
+### 3. Ambil Data Produk (Butuh Token)
+GET http://127.0.0.1:8000/api/produk
+Accept: application/json
+Authorization: Bearer 2|UZWYQ1TeXUELukqIh0rkY1UWgR4qmH1nbvHizZ3H66310580
