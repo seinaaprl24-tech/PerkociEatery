@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Perkoci V60 Artisan">
+  <defs>
+    <linearGradient id="bg2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f4f1e4"/>
+      <stop offset="1" stop-color="#dcd4bd"/>
+    </linearGradient>
+    <linearGradient id="brew" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c08a4c"/>
+      <stop offset="1" stop-color="#3d2b1f"/>
+    </linearGradient>
+    <linearGradient id="dripper" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#ddd6c2"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="400" height="300" fill="url(#bg2)"/>
+  <circle cx="72" cy="58" r="44" fill="#5f6020" opacity=".07"/>
+  <circle cx="342" cy="250" r="56" fill="#195905" opacity=".05"/>
+
+  <ellipse cx="200" cy="256" rx="92" ry="12" fill="#3d2b1f" opacity=".14"/>
+
+  <!-- carafe -->
+  <path d="M170 168h60v52a30 30 0 0 1-30 30 30 30 0 0 1-30-30v-52Z" fill="#ffffff" opacity=".8"/>
+  <path d="M170 190h60v30a30 30 0 0 1-30 30 30 30 0 0 1-30-30v-30Z" fill="url(#brew)"/>
+  <path d="M170 168h60v52a30 30 0 0 1-30 30 30 30 0 0 1-30-30v-52Z" fill="none" stroke="#3d2b1f" stroke-opacity=".3" stroke-width="3"/>
+
+  <!-- dripper V60 -->
+  <path d="M138 62h124l-62 104-62-104Z" fill="url(#dripper)"/>
+  <path d="M138 62h124l-62 104-62-104Z" fill="none" stroke="#3d2b1f" stroke-opacity=".32" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M158 84h84l-42 68-42-68Z" fill="#8a6a3f" opacity=".55"/>
+  <ellipse cx="200" cy="62" rx="62" ry="12" fill="#f9f8f3" stroke="#3d2b1f" stroke-opacity=".3" stroke-width="3"/>
+
+  <!-- tetesan -->
+  <path d="M200 166v14" stroke="#8a6a3f" stroke-width="5" stroke-linecap="round" opacity=".6"/>
+
+  <!-- srv / alas -->
+  <rect x="126" y="244" width="148" height="12" rx="6" fill="#3d2b1f" opacity=".8"/>
+</svg>

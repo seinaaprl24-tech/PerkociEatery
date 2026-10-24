@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Croissant Almond Toast">
+  <defs>
+    <linearGradient id="bg5" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f6f2e6"/>
+      <stop offset="1" stop-color="#e6dcbe"/>
+    </linearGradient>
+    <linearGradient id="cr" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e8b96b"/>
+      <stop offset="1" stop-color="#a9712f"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="400" height="300" fill="url(#bg5)"/>
+  <circle cx="70" cy="62" r="44" fill="#bdb76b" opacity=".22"/>
+  <circle cx="340" cy="250" r="56" fill="#195905" opacity=".05"/>
+
+  <ellipse cx="200" cy="256" rx="118" ry="14" fill="#3d2b1f" opacity=".14"/>
+
+  <!-- papan -->
+  <rect x="78" y="196" width="244" height="26" rx="13" fill="#8a6a3f" opacity=".55"/>
+
+  <!-- croissant -->
+  <path d="M96 196c6-52 44-84 104-84s98 32 104 84c-30 16-178 16-208 0Z" fill="url(#cr)"/>
+  <path d="M148 118c-16 24-20 52-14 78" stroke="#f7e3bc" stroke-width="7" stroke-linecap="round" opacity=".55" fill="none"/>
+  <path d="M200 110c-6 30-6 58 0 86" stroke="#f7e3bc" stroke-width="7" stroke-linecap="round" opacity=".45" fill="none"/>
+  <path d="M252 118c16 24 20 52 14 78" stroke="#f7e3bc" stroke-width="7" stroke-linecap="round" opacity=".55" fill="none"/>
+
+  <!-- almond -->
+  <g fill="#f4e3c0">
+    <ellipse cx="176" cy="150" rx="11" ry="6" transform="rotate(-18 176 150)"/>
+    <ellipse cx="214" cy="142" rx="11" ry="6" transform="rotate(12 214 142)"/>
+    <ellipse cx="236" cy="166" rx="11" ry="6" transform="rotate(-24 236 166)"/>
+    <ellipse cx="188" cy="180" rx="11" ry="6" transform="rotate(28 188 180)"/>
+    <ellipse cx="158" cy="178" rx="11" ry="6" transform="rotate(-8 158 178)"/>
+  </g>
+
+  <!-- serpihan butter -->
+  <path d="M258 118c14-12 32-10 38 2 6 12-4 26-20 28-14 2-26-8-24-18" fill="#f7e3bc" opacity=".9"/>
+</svg>
