@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Barista Special Duo">
+  <defs>
+    <linearGradient id="bg6" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7f3e8"/>
+      <stop offset="1" stop-color="#e3dcc2"/>
+    </linearGradient>
+    <linearGradient id="brew6" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#b5763c"/>
+      <stop offset="1" stop-color="#3d2b1f"/>
+    </linearGradient>
+    <linearGradient id="cr6" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e8b96b"/>
+      <stop offset="1" stop-color="#a9712f"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="400" height="300" fill="url(#bg6)"/>
+  <circle cx="326" cy="58" r="46" fill="#195905" opacity=".07"/>
+  <circle cx="58" cy="250" r="52" fill="#bdb76b" opacity=".2"/>
+
+  <ellipse cx="200" cy="256" rx="140" ry="14" fill="#3d2b1f" opacity=".14"/>
+
+  <!-- cangkir kopi -->
+  <path d="M104 130h84v62a32 32 0 0 1-32 32h-20a32 32 0 0 1-32-32v-62Z" fill="#ffffff" opacity=".9"/>
+  <path d="M104 152h84v40a32 32 0 0 1-32 32h-20a32 32 0 0 1-32-32v-40Z" fill="url(#brew6)"/>
+  <path d="M104 130h84v62a32 32 0 0 1-32 32h-20a32 32 0 0 1-32-32v-62Z" fill="none" stroke="#3d2b1f" stroke-opacity=".3" stroke-width="3"/>
+  <path d="M188 148h10a18 18 0 0 1 0 36h-12" stroke="#3d2b1f" stroke-opacity=".35" stroke-width="7" fill="none" stroke-linecap="round"/>
+  <ellipse cx="146" cy="130" rx="42" ry="9" fill="#f9f8f3" stroke="#3d2b1f" stroke-opacity=".3" stroke-width="3"/>
+
+  <!-- croissant -->
+  <path d="M214 214c4-36 30-58 72-58s68 22 72 58c-22 11-122 11-144 0Z" fill="url(#cr6)"/>
+  <path d="M252 162c-11 16-14 36-10 54" stroke="#f7e3bc" stroke-width="5" stroke-linecap="round" opacity=".55" fill="none"/>
+  <path d="M290 156c-4 20-4 40 0 58" stroke="#f7e3bc" stroke-width="5" stroke-linecap="round" opacity=".45" fill="none"/>
+  <path d="M326 162c11 16 14 36 10 54" stroke="#f7e3bc" stroke-width="5" stroke-linecap="round" opacity=".55" fill="none"/>
+  <g fill="#f4e3c0">
+    <ellipse cx="272" cy="182" rx="8" ry="4.5" transform="rotate(-16 272 182)"/>
+    <ellipse cx="302" cy="176" rx="8" ry="4.5" transform="rotate(10 302 176)"/>
+    <ellipse cx="318" cy="196" rx="8" ry="4.5" transform="rotate(-22 318 196)"/>
+  </g>
+</svg>

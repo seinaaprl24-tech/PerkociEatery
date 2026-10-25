@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Es Kopi Perkoci Aren">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f4f1e4"/>
+      <stop offset="1" stop-color="#dfd8c2"/>
+    </linearGradient>
+    <linearGradient id="coffee" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#b5763c"/>
+      <stop offset="1" stop-color="#3d2b1f"/>
+    </linearGradient>
+    <linearGradient id="milk" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f7f4ea"/>
+      <stop offset="1" stop-color="#e3dcc6"/>
+    </linearGradient>
+    <clipPath id="glass">
+      <path d="M148 78h104l-12 132a22 22 0 0 1-22 20h-36a22 22 0 0 1-22-20L148 78Z"/>
+    </clipPath>
+  </defs>
+
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <circle cx="330" cy="52" r="46" fill="#195905" opacity=".07"/>
+  <circle cx="66" cy="258" r="60" fill="#195905" opacity=".05"/>
+
+  <!-- alas -->
+  <ellipse cx="200" cy="252" rx="86" ry="13" fill="#3d2b1f" opacity=".14"/>
+
+  <!-- gelas -->
+  <path d="M148 78h104l-12 132a22 22 0 0 1-22 20h-36a22 22 0 0 1-22-20L148 78Z" fill="#ffffff" opacity=".75"/>
+  <g clip-path="url(#glass)">
+    <rect x="140" y="96" width="120" height="140" fill="url(#coffee)"/>
+    <path d="M140 132c22-14 42 10 62-2s42 12 58 2v104H140Z" fill="url(#milk)" opacity=".92"/>
+    <rect x="168" y="104" width="28" height="28" rx="7" fill="#ffffff" opacity=".45"/>
+    <rect x="206" y="122" width="24" height="24" rx="6" fill="#ffffff" opacity=".38"/>
+    <rect x="182" y="158" width="22" height="22" rx="6" fill="#ffffff" opacity=".32"/>
+  </g>
+  <path d="M148 78h104l-12 132a22 22 0 0 1-22 20h-36a22 22 0 0 1-22-20L148 78Z" fill="none" stroke="#3d2b1f" stroke-opacity=".35" stroke-width="3"/>
+
+  <!-- sedotan -->
+  <rect x="228" y="34" width="12" height="150" rx="6" fill="#195905" transform="rotate(9 234 100)"/>
+
+  <!-- daun aren -->
+  <path d="M118 236c-14-10-12-30 2-38 12-7 26 1 27 14 1 12-9 22-20 24" fill="#bdb76b" opacity=".85"/>
+</svg>

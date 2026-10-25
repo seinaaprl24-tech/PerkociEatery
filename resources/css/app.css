@@ -1,11 +1,325 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../storage/framework/views/*.php';
-@source '../**/*.blade.php';
-@source '../**/*.js';
+@source "../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php";
+@source "../views";
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+    /* ---- Brand palette ---- */
+    --color-brand: #195905;
+    --color-brand-dark: #0f3d03;
+    --color-brand-soft: #2e7d12;
+    --color-khaki: #bdb76b;
+    --color-cocoa: #3d2b1f;
+    --color-cocoa-soft: #6f5b4c;
+    --color-cream: #f9f8f3;
+    --color-sand: #efeee9;
+    --color-lime: #aaf68c;
+    --color-butter: #ebe79a;
+    --color-olive: #5f6020;
+    --color-danger: #ba1a1a;
+
+    /* ---- Typography ---- */
+    --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-display: "Space Grotesk", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+    --font-heading: "Space Grotesk", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+    --font-symbols: "Material Symbols Outlined";
+
+    /* ---- Shadow ---- */
+    --shadow-card: 0 1px 2px rgb(61 43 31 / 0.05), 0 10px 26px -16px rgb(61 43 31 / 0.22);
+    --shadow-soft: 0 1px 2px rgb(61 43 31 / 0.05), 0 6px 16px -12px rgb(61 43 31 / 0.18);
+    --shadow-bar: 0 -8px 26px -14px rgb(61 43 31 / 0.28);
+}
+
+@layer base {
+    html {
+        -webkit-text-size-adjust: 100%;
+        scroll-behavior: smooth;
+    }
+
+    body {
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    ::selection {
+        background-color: var(--color-lime);
+        color: var(--color-cocoa);
+    }
+
+    /* Hide native number spinners on quantity inputs */
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+}
+
+@layer components {
+    /* ---------- Surfaces ---------- */
+    .card {
+        @apply rounded-2xl bg-white shadow-card;
+    }
+
+    .panel {
+        @apply rounded-2xl bg-sand;
+    }
+
+    /* ---------- Pills ---------- */
+    .pill {
+        @apply inline-flex items-center gap-1 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.08em] leading-none;
+    }
+
+    .pill-sm {
+        @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] leading-none;
+    }
+
+    /* ---------- Buttons ---------- */
+    .btn-primary {
+        @apply inline-flex items-center justify-center gap-2 rounded-full bg-brand px-5 py-3 text-sm font-bold text-white shadow-soft transition active:scale-[0.98];
+    }
+
+    .btn-primary:hover {
+        @apply bg-brand-dark;
+    }
+
+    .btn-primary:disabled {
+        @apply cursor-not-allowed opacity-50 active:scale-100;
+    }
+
+    .btn-ghost {
+        @apply inline-flex items-center justify-center gap-2 rounded-full border border-cocoa/15 bg-white px-5 py-3 text-sm font-bold text-cocoa transition active:scale-[0.98];
+    }
+
+    .btn-ghost:hover {
+        @apply bg-sand;
+    }
+
+    .btn-secondary {
+        @apply inline-flex items-center justify-center gap-2 rounded-full bg-sand px-5 py-3 text-sm font-bold text-cocoa transition active:scale-[0.98];
+    }
+
+    .btn-secondary:hover {
+        @apply bg-cocoa/10;
+    }
+
+    .btn-danger {
+        @apply inline-flex items-center justify-center gap-2 rounded-full bg-danger px-5 py-3 text-sm font-bold text-white shadow-soft transition active:scale-[0.98];
+    }
+
+    .btn-danger:hover {
+        @apply brightness-95;
+    }
+
+    .btn-sm {
+        @apply px-3.5 py-2 text-xs;
+    }
+
+    .btn-icon {
+        @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-cocoa/70 transition hover:bg-cocoa/10 hover:text-cocoa;
+    }
+
+    .btn-primary:disabled,
+    .btn-ghost:disabled,
+    .btn-secondary:disabled,
+    .btn-danger:disabled {
+        @apply cursor-not-allowed opacity-50 active:scale-100;
+    }
+
+    /* ---------- Chips (filter categories) ---------- */
+    .chip {
+        @apply inline-flex shrink-0 items-center gap-1.5 rounded-full bg-sand px-4 py-2 text-xs font-semibold text-cocoa/70 transition hover:bg-cocoa/10;
+    }
+
+    .chip-active {
+        @apply bg-brand text-white hover:bg-brand;
+    }
+
+    /* ---------- Form ---------- */
+    .field {
+        @apply w-full rounded-xl border border-cocoa/10 bg-sand px-4 py-3 text-sm text-cocoa placeholder:text-cocoa/40 outline-none transition focus:border-brand/40 focus:bg-white focus:ring-2 focus:ring-brand/15;
+    }
+
+    .field-label {
+        @apply mb-1.5 block text-xs font-bold uppercase tracking-[0.08em] text-cocoa/60;
+    }
+
+    .field-hint {
+        @apply mt-1.5 text-[11px] leading-relaxed text-cocoa/50;
+    }
+
+    .field-error {
+        @apply mt-1.5 flex items-start gap-1 text-[11px] font-medium text-danger;
+    }
+
+    .field-invalid {
+        @apply border-danger/50 bg-white ring-2 ring-danger/10 focus:border-danger/60 focus:ring-danger/15;
+    }
+
+    .login-spinner {
+        @apply h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white;
+    }
+
+    /* ---------- Badges (status) ---------- */
+    .badge {
+        @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] leading-none;
+    }
+
+    .badge-brand {
+        @apply bg-brand/10 text-brand;
+    }
+
+    .badge-lime {
+        @apply bg-lime text-cocoa;
+    }
+
+    .badge-butter {
+        @apply bg-butter text-cocoa;
+    }
+
+    .badge-danger {
+        @apply bg-danger/10 text-danger;
+    }
+
+    .badge-neutral {
+        @apply bg-sand text-cocoa/60;
+    }
+
+    /* ---------- Page header ---------- */
+    .page-header {
+        @apply flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between;
+    }
+
+    /* ---------- Data table ---------- */
+    .table-wrap {
+        @apply overflow-x-auto rounded-2xl border border-cocoa/10 bg-white;
+    }
+
+    .data-table {
+        @apply w-full border-collapse text-left text-sm;
+    }
+
+    .data-table thead {
+        @apply bg-sand/70;
+    }
+
+    .data-table th {
+        @apply whitespace-nowrap px-4 py-3 text-[10px] font-bold uppercase tracking-[0.08em] text-cocoa/50;
+    }
+
+    .data-table td {
+        @apply border-t border-cocoa/10 px-4 py-3 align-middle text-cocoa/75;
+    }
+
+    .data-table tbody tr:hover {
+        @apply bg-cream/70;
+    }
+
+    /* ---------- Toast ---------- */
+    .toast {
+        @apply pointer-events-auto flex items-start gap-3 rounded-xl bg-cocoa px-4 py-3 text-sm font-medium text-cream shadow-card;
+        animation: toast-in 0.22s ease-out;
+    }
+
+    .toast-success {
+        @apply bg-brand text-white;
+    }
+
+    .toast-danger {
+        @apply bg-danger text-white;
+    }
+
+    /* ---------- Modal (native <dialog>) ---------- */
+    .modal {
+        width: min(28rem, calc(100% - 2rem));
+        max-height: min(90vh, 44rem);
+        margin: auto;
+        border: 0;
+        padding: 0;
+        overflow-y: auto;
+        border-radius: 1rem;
+        background: #fff;
+        color: var(--color-cocoa);
+        box-shadow: var(--shadow-card);
+    }
+
+    .modal::backdrop {
+        background: rgb(61 43 31 / 0.42);
+        backdrop-filter: blur(2px);
+    }
+
+    .modal[open] {
+        animation: modal-in 0.18s ease-out;
+    }
+
+    /* ---------- Utilities ---------- */
+    .scrollbar-none {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+
+    .scrollbar-none::-webkit-scrollbar {
+        display: none;
+    }
+
+    .no-tap-highlight {
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ---------- Material Symbols Outlined ---------- */
+    /* Di layer components supaya utility text-[Npx] tetap menang. */
+    .ms {
+        font-family: "Material Symbols Outlined";
+        font-weight: normal;
+        font-style: normal;
+        font-size: 20px;
+        line-height: 1;
+        letter-spacing: normal;
+        text-transform: none;
+        display: inline-block;
+        white-space: nowrap;
+        word-wrap: normal;
+        direction: ltr;
+        font-feature-settings: "liga";
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+
+    .ms-fill {
+        font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24;
+    }
+
+    .ms-wght {
+        font-variation-settings: "FILL" 0, "wght" 600, "GRAD" 0, "opsz" 24;
+    }
+}
+
+@layer utilities {
+    .text-balance {
+        text-wrap: balance;
+    }
+}
+
+@keyframes toast-in {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+}
+
+@keyframes modal-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.98);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
 }
