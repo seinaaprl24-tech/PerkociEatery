@@ -47,7 +47,7 @@
         {{-- Kartu item --}}
         <div class="mt-4 space-y-3" data-cart-list>
             @foreach ($items as $index => $item)
-                <article class="card p-3" data-cart-item data-index="{{ $index }}" data-price="{{ $item['price'] }}">
+                <article class="card p-3" data-cart-item data-index="{{ $index }}" data-price="{{ $item['price'] }}" data-id-produk="{{ $item['id'] ?? $item['id_produk'] ?? ($item['slug'] ? null : null) }}">
                     <div class="flex gap-3">
                         <div class="h-[84px] w-[84px] shrink-0 overflow-hidden rounded-2xl bg-sand">
                             <x-menu-thumb :item="$item" size="text-[26px]" />
@@ -248,9 +248,45 @@
                 }
             });
 
-            document.querySelector('[data-submit]').addEventListener('click', function () {
-                this.textContent = 'Pesanan Terkirim ke Dapur ✓';
-                this.classList.add('bg-brand-dark');
+            document.querySelector('[data-submit]').addEventListener('click', async function () {
+                var btn = this;
+                var items = readItems();
+                if (!items.length) {
+                    if (window.perkociToast) window.perkociToast('Keranjang kosong', 'danger');
+                    return;
+                }
+
+                var payload = {
+                    id_meja: 1,
+                    items: items.map(function (item) {
+                        return {
+                            id_produk: parseInt(item.card.getAttribute('data-id-produk'), 10),
+                            jumlah: item.qty,
+                            harga_satuan: item.price,
+                        };
+                    }),
+                };
+
+                btn.disabled = true;
+                var original = btn.innerHTML;
+                btn.innerHTML = '<span>Memproses...</span>';
+
+                try {
+                    var res = await axios.post('/api/pesanan', payload, { headers: { 'Accept': 'application/json' } });
+                    if (res.data && res.data.success) {
+                        if (window.perkociToast) window.perkociToast('Pesanan berhasil dibuat', 'success');
+                        setTimeout(function () { window.location.href = '/status'; }, 800);
+                    } else {
+                        if (window.perkociToast) window.perkociToast(res.data.message || 'Gagal membuat pesanan', 'danger');
+                        btn.disabled = false;
+                        btn.innerHTML = original;
+                    }
+                } catch (e) {
+                    var msg = (e.response && e.response.data && e.response.data.message) ? e.response.data.message : 'Gagal membuat pesanan';
+                    if (window.perkociToast) window.perkociToast(msg, 'danger');
+                    btn.disabled = false;
+                    btn.innerHTML = original;
+                }
             });
 
             render();

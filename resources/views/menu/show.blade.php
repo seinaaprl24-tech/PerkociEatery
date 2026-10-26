@@ -114,7 +114,7 @@
                 </button>
             </div>
 
-            <button type="button" data-add-to-cart class="btn-primary flex-1 py-3.5">
+            <button type="button" data-add-to-cart data-id="{{ $item['id'] ?? $item['id_produk'] ?? '' }}" class="btn-primary flex-1 py-3.5">
                 Keranjang
                 <span class="opacity-70">•</span>
                 <span data-total>{{ Perkoci::rupiah($basePrice) }}</span>
