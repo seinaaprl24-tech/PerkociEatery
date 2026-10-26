@@ -2,9 +2,7 @@
 
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\PreviewController;
-use App\Http\Controllers\Web\AuthController as WebAuthController;
 use Illuminate\Support\Facades\Route;
-
 
 /*
 |--------------------------------------------------------------------------
@@ -33,7 +31,7 @@ Route::get('/status', [CustomerController::class, 'status'])->name('status');
 | (beserta PreviewController) saat backend & desain final siap.
 */
 
-Route::get('/login', [PreviewController::class, 'login'])->name('login');
+Route::get('/login', [PreviewController::class, 'login'])->name('preview.login');
 
 Route::get('/preview/manager', [PreviewController::class, 'manager'])->name('preview.manager');
 
@@ -58,18 +56,4 @@ Route::get('/preview/manager/reports', [PreviewController::class, 'managerReport
 Route::get('/preview/manager/finance', [PreviewController::class, 'managerFinance'])->name('preview.manager.finance');
 Route::get('/preview/manager/export', [PreviewController::class, 'managerExport'])->name('preview.manager.export');
 
-Route::post('/login', [WebAuthController::class, 'login'])->middleware('throttle:5,1')->name('login.attempt');
-Route::post('/logout', [WebAuthController::class, 'logout'])->name('logout');
-
-Route::middleware(['auth', 'role:admin'])->group(function () {
-    Route::get('/admin', [\App\Http\Controllers\PreviewController::class, 'admin'])->name('admin.dashboard');
-});
-
-Route::middleware(['auth', 'role:kasir'])->group(function () {
-    Route::get('/kasir', [\App\Http\Controllers\PreviewController::class, 'kasir'])->name('kasir.dashboard');
-});
-
-Route::middleware(['auth', 'role:manager'])->group(function () {
-    Route::get('/manager', [\App\Http\Controllers\PreviewController::class, 'manager'])->name('manager.dashboard');
-});
 

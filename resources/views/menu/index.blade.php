@@ -83,7 +83,7 @@
                                 <span class="text-[10px] font-semibold text-cocoa/40">/ {{ $item['unit'] ?? 'porsi' }}</span>
                             </p>
 
-                            <button type="button" data-add="{{ $item['name'] }}" data-price="{{ $item['price'] }}" data-id="{{ $item['id'] ?? $item['id_produk'] ?? '' }}"
+                            <button type="button" data-add="{{ $item['name'] }}" data-price="{{ $item['price'] }}"
                                 class="no-tap-highlight flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand text-xl font-bold leading-none text-white shadow-soft transition active:scale-90"
                                 aria-label="Tambah {{ $item['name'] }}">
                                 +
