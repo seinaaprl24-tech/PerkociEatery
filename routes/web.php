@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\PreviewController;
+use App\Http\Controllers\Web\AuthController as WebAuthController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -22,6 +23,40 @@ Route::get('/status', [CustomerController::class, 'status'])->name('status');
 
 /*
 |--------------------------------------------------------------------------
+| Login & Logout staff (session)
+|--------------------------------------------------------------------------
+| GET /login bernama "login" supaya middleware auth dan EnsureUserHasRole
+| bisa mengarahkan user yang belum login ke halaman ini.
+*/
+
+Route::get('/login', [PreviewController::class, 'login'])->name('login');
+
+Route::post('/login', [WebAuthController::class, 'login'])
+    ->middleware('throttle:5,1')
+    ->name('login.attempt');
+
+Route::post('/logout', [WebAuthController::class, 'logout'])->name('logout');
+
+/*
+|--------------------------------------------------------------------------
+| Dashboard staff (wajib login + role)
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware(['auth', 'role:admin'])->group(function () {
+    Route::get('/admin', [PreviewController::class, 'admin'])->name('admin.dashboard');
+});
+
+Route::middleware(['auth', 'role:kasir'])->group(function () {
+    Route::get('/kasir', [PreviewController::class, 'kasir'])->name('kasir.dashboard');
+});
+
+Route::middleware(['auth', 'role:manager'])->group(function () {
+    Route::get('/manager', [PreviewController::class, 'manager'])->name('manager.dashboard');
+});
+
+/*
+|--------------------------------------------------------------------------
 | PREVIEW ONLY — kerangka UI staff (Tahap 2)
 |--------------------------------------------------------------------------
 | TEMPORARY – hapus saat auth/backend siap, jangan dipublikasikan ke produksi.
@@ -30,8 +65,6 @@ Route::get('/status', [CustomerController::class, 'status'])->name('status');
 | tidak memakai middleware, dan tidak membuat sesi login. Hapus bagian ini
 | (beserta PreviewController) saat backend & desain final siap.
 */
-
-Route::get('/login', [PreviewController::class, 'login'])->name('preview.login');
 
 Route::get('/preview/manager', [PreviewController::class, 'manager'])->name('preview.manager');
 
@@ -55,5 +88,3 @@ Route::get('/preview/admin/settings', [PreviewController::class, 'adminSettings'
 Route::get('/preview/manager/reports', [PreviewController::class, 'managerReports'])->name('preview.manager.reports');
 Route::get('/preview/manager/finance', [PreviewController::class, 'managerFinance'])->name('preview.manager.finance');
 Route::get('/preview/manager/export', [PreviewController::class, 'managerExport'])->name('preview.manager.export');
-
-
