@@ -16,6 +16,16 @@ use Illuminate\Validation\ValidationException;
 class PembayaranController extends Controller
 {
     /**
+     * Metode pembayaran yang diizinkan (kunci dari client => nama di tabel).
+     */
+    private const METODE_MAP = [
+        'tunai' => 'Tunai',
+        'qris' => 'QRIS',
+        'transfer' => 'E-Wallet',
+        'e-wallet' => 'E-Wallet',
+    ];
+
+    /**
      * Menampilkan semua riwayat pembayaran.
      */
     public function index(): AnonymousResourceCollection
@@ -43,7 +53,8 @@ class PembayaranController extends Controller
         $validated = $request->validated();
 
         $pembayaran = DB::transaction(function () use ($validated) {
-            $pesanan = Pesanan::find($validated['pesanan_id']);
+            // Kunci baris pesanan agar dua kasir tidak bisa membayar pesanan yang sama bersamaan.
+            $pesanan = Pesanan::lockForUpdate()->find($validated['pesanan_id']);
 
             if (! $pesanan) {
                 throw ValidationException::withMessages([
@@ -57,7 +68,11 @@ class PembayaranController extends Controller
                 ]);
             }
 
-            if (Pembayaran::where('id_pesanan', $pesanan->id_pesanan)->exists()) {
+            // Hanya pembayaran LUNAS yang menghalangi; percobaan yang dibatalkan boleh diulang
+            // (sesuai relasi Pesanan 1 : N Pembayaran pada ERD).
+            if (Pembayaran::where('id_pesanan', $pesanan->id_pesanan)
+                ->where('status_pembayaran', 'lunas')
+                ->exists()) {
                 throw ValidationException::withMessages([
                     'pesanan_id' => ['Pembayaran untuk pesanan ini sudah ada.'],
                 ]);
@@ -72,19 +87,16 @@ class PembayaranController extends Controller
                 ]);
             }
 
-            $metodeMap = [
-                'tunai' => 'Tunai',
-                'qris' => 'QRIS',
-                'transfer' => 'E-Wallet',
-                'e-wallet' => 'E-Wallet',
-            ];
+            $kunciMetode = strtolower(trim((string) $validated['metode_pembayaran']));
+            $namaMetode = self::METODE_MAP[$kunciMetode] ?? null;
 
-            $namaMetode = $metodeMap[$validated['metode_pembayaran']] ?? ucfirst($validated['metode_pembayaran']);
-            $metode = MetodePembayaran::where('nama_metode', $namaMetode)->first();
-
-            if (! $metode) {
-                $metode = MetodePembayaran::firstOrCreate(['nama_metode' => $namaMetode]);
+            if ($namaMetode === null) {
+                throw ValidationException::withMessages([
+                    'metode_pembayaran' => ['Metode pembayaran tidak dikenal.'],
+                ]);
             }
+
+            $metode = MetodePembayaran::firstOrCreate(['nama_metode' => $namaMetode]);
 
             $kembalian = $jumlahBayar - $totalHarga;
 

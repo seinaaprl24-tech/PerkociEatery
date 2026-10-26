@@ -6,44 +6,15 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
     /**
-     * Mendaftarkan user baru dan mengembalikan token API.
-     */
-    public function register(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'nama' => ['required', 'string', 'max:255'],
-            'username' => ['required', 'string', 'max:255', 'unique:users,username'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
-            'role' => ['required', Rule::in(['admin', 'kasir', 'manager'])],
-            'device_name' => ['nullable', 'string', 'max:255'],
-        ]);
-
-        $user = User::create([
-            'nama' => $validated['nama'],
-            'username' => $validated['username'],
-            'password' => $validated['password'],
-            'role' => $validated['role'],
-        ]);
-
-        $token = $user->createToken(
-            $validated['device_name'] ?? 'api-token'
-        )->plainTextToken;
-
-        return response()->json([
-            'message' => 'Registrasi berhasil.',
-            'user' => $user,
-            'token' => $token,
-        ], 201);
-    }
-
-    /**
      * Login user dan mengembalikan token API.
+     *
+     * Catatan: pendaftaran publik (register) sengaja dihapus. Akun staff dibuat
+     * oleh admin lewat UserController::store.
      */
     public function login(Request $request): JsonResponse
     {

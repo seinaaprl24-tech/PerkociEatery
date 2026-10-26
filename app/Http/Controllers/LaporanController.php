@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\DetailPesanan;
 use App\Models\Pembayaran;
 use App\Models\Pesanan;
-use App\Models\Produk;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,34 +15,20 @@ class LaporanController extends Controller
     public function getDailyStats(): JsonResponse
     {
         $today = Carbon::today();
+        $start = $today->copy()->startOfDay();
+        $end = $today->copy()->endOfDay();
 
-        $totalPemasukan = Pembayaran::whereDate('tanggal_pembayaran', $today)
-            ->where('status_pembayaran', 'lunas')
-            ->sum('jumlah_bayar');
-
-        if ($totalPemasukan == 0) {
-            $totalPemasukan = Pesanan::whereDate('tanggal_pesan', $today)
-                ->where('status_pesanan', 'selesai')
-                ->sum('total_harga');
-        }
-
-        $pesananDiproses = Pesanan::whereDate('tanggal_pesan', $today)
+        $pesananDiproses = Pesanan::whereBetween('tanggal_pesan', [$start, $end])
             ->where('status_pesanan', 'diproses')
             ->count();
 
-        $pesananSelesai = Pesanan::whereDate('tanggal_pesan', $today)
-            ->whereIn('status_pesanan', ['selesai', 'lunas'])
+        $pesananSelesai = Pesanan::whereBetween('tanggal_pesan', [$start, $end])
+            ->where('status_pesanan', 'selesai')
             ->count();
-
-        if ($pesananSelesai == 0) {
-            $pesananSelesai = Pesanan::whereDate('tanggal_pesan', $today)
-                ->where('status_pesanan', 'selesai')
-                ->count();
-        }
 
         return response()->json([
             'tanggal' => $today->toDateString(),
-            'total_pemasukan' => (float) $totalPemasukan,
+            'total_pemasukan' => $this->hitungPemasukan($start, $end),
             'jumlah_pesanan_diproses' => $pesananDiproses,
             'jumlah_pesanan_selesai' => $pesananSelesai,
         ]);
@@ -61,7 +46,7 @@ class LaporanController extends Controller
         )
             ->join('produk', 'produk.id_produk', '=', 'detail_pesanan.id_produk')
             ->join('pesanan', 'pesanan.id_pesanan', '=', 'detail_pesanan.id_pesanan')
-            ->whereIn('pesanan.status_pesanan', ['selesai', 'lunas'])
+            ->where('pesanan.status_pesanan', 'selesai')
             ->groupBy('detail_pesanan.id_produk', 'produk.nama_produk', 'produk.kategori', 'produk.harga')
             ->orderByDesc('total_terjual')
             ->limit(5)
@@ -74,22 +59,12 @@ class LaporanController extends Controller
 
     public function getMonthlyIncome(): JsonResponse
     {
-        $startOfMonth = Carbon::now()->startOfMonth();
-        $endOfMonth = Carbon::now()->endOfMonth();
-
-        $totalPemasukan = Pembayaran::whereBetween('tanggal_pembayaran', [$startOfMonth, $endOfMonth])
-            ->where('status_pembayaran', 'lunas')
-            ->sum('jumlah_bayar');
-
-        if ($totalPemasukan == 0) {
-            $totalPemasukan = Pesanan::whereBetween('tanggal_pesan', [$startOfMonth, $endOfMonth])
-                ->where('status_pesanan', 'selesai')
-                ->sum('total_harga');
-        }
+        $start = Carbon::now()->startOfMonth();
+        $end = Carbon::now()->endOfMonth();
 
         return response()->json([
             'bulan' => Carbon::now()->format('Y-m'),
-            'total_pemasukan' => (float) $totalPemasukan,
+            'total_pemasukan' => $this->hitungPemasukan($start, $end),
         ]);
     }
 
@@ -103,21 +78,14 @@ class LaporanController extends Controller
         $start = Carbon::parse($validated['start_date'])->startOfDay();
         $end = Carbon::parse($validated['end_date'])->endOfDay();
 
-        $totalTransaksi = Pesanan::whereBetween('tanggal_pesan', [$start, $end])
-            ->count();
+        // Laporan penjualan = pesanan yang sudah selesai (sudah dibayar).
+        $pesananSelesai = Pesanan::whereBetween('tanggal_pesan', [$start, $end])
+            ->where('status_pesanan', 'selesai');
 
-        $totalPendapatan = Pembayaran::whereBetween('tanggal_pembayaran', [$start, $end])
-            ->where('status_pembayaran', 'lunas')
-            ->sum('jumlah_bayar');
+        $totalTransaksi = (clone $pesananSelesai)->count();
 
-        if ($totalPendapatan == 0) {
-            $totalPendapatan = Pesanan::whereBetween('tanggal_pesan', [$start, $end])
-                ->whereIn('status_pesanan', ['selesai', 'lunas'])
-                ->sum('total_harga');
-        }
-
-        $transaksi = Pesanan::with(['meja', 'detailPesanan.produk', 'pembayaran'])
-            ->whereBetween('tanggal_pesan', [$start, $end])
+        $transaksi = (clone $pesananSelesai)
+            ->with(['meja', 'detailPesanan.produk', 'pembayaran'])
             ->orderByDesc('tanggal_pesan')
             ->get();
 
@@ -126,8 +94,19 @@ class LaporanController extends Controller
             'start_date' => $start->toDateString(),
             'end_date' => $end->toDateString(),
             'total_transaksi' => $totalTransaksi,
-            'total_pendapatan' => (float) $totalPendapatan,
+            'total_pendapatan' => $this->hitungPemasukan($start, $end),
             'data' => $transaksi,
         ]);
+    }
+
+    /**
+     * Pemasukan bersih dari pembayaran lunas: jumlah_bayar dikurangi kembalian.
+     * (jumlah_bayar adalah uang yang diserahkan customer, belum dipotong kembalian.)
+     */
+    private function hitungPemasukan(Carbon $start, Carbon $end): float
+    {
+        return (float) Pembayaran::whereBetween('tanggal_pembayaran', [$start, $end])
+            ->where('status_pembayaran', 'lunas')
+            ->sum(DB::raw('jumlah_bayar - COALESCE(kembalian, 0)'));
     }
 }
