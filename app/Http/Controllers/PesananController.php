@@ -8,6 +8,7 @@ use App\Models\DetailPesanan;
 use App\Models\Pesanan;
 use App\Models\Produk;
 use App\Models\Stok;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -36,42 +37,63 @@ class PesananController extends Controller
     {
         $validated = $request->validated();
 
-        $pesanan = DB::transaction(function () use ($validated) {
-            $totalHarga = 0;
+        $pesanan = null;
 
-            foreach ($validated['items'] as $item) {
-                $totalHarga += ($item['harga_satuan'] * $item['jumlah']);
+        for ($percobaan = 1; $percobaan <= 3; $percobaan++) {
+            try {
+                $pesanan = $this->simpanPesanan($validated);
+                break;
+            } catch (UniqueConstraintViolationException $e) {
+                // Nomor antrean bentrok dengan pesanan lain yang masuk bersamaan: coba lagi.
+                if ($percobaan === 3) {
+                    throw $e;
+                }
             }
+        }
 
-            $nomorAntrean = $this->generateNomorAntrean();
+        return (new PesananResource($pesanan->load(['meja', 'detailPesanan.produk'])))
+            ->response()
+            ->setStatusCode(201);
+    }
 
+    private function simpanPesanan(array $validated): Pesanan
+    {
+        return DB::transaction(function () use ($validated) {
             $pesanan = Pesanan::create([
                 'id_meja' => $validated['id_meja'],
-                'nomor_antrean' => $nomorAntrean,
+                'nomor_antrean' => $this->generateNomorAntrean(),
                 'tanggal_pesan' => Carbon::now(),
-                'total_harga' => $totalHarga,
+                'total_harga' => 0,
                 'status_pesanan' => 'menunggu',
             ]);
 
+            $totalHarga = 0;
+
             foreach ($validated['items'] as $item) {
-                $produk = Produk::find($item['id_produk']);
-                $stok = Stok::where('id_produk', $item['id_produk'])->lockForUpdate()->first();
+                // Harga SELALU dari database, bukan dari request client.
+                $produk = Produk::findOrFail($item['id_produk']);
+
+                $stok = Stok::where('id_produk', $produk->id_produk)
+                    ->lockForUpdate()
+                    ->first();
 
                 if (! $stok || $stok->jumlah_stok < $item['jumlah']) {
                     throw ValidationException::withMessages([
-                        'items' => ['Stok untuk produk tidak mencukupi.'],
+                        'items' => ["Stok untuk {$produk->nama_produk} tidak mencukupi."],
                     ]);
                 }
 
                 $stok->decrement('jumlah_stok', $item['jumlah']);
 
-                $subtotal = $item['harga_satuan'] * $item['jumlah'];
+                $harga = (float) $produk->harga;
+                $subtotal = $harga * $item['jumlah'];
+                $totalHarga += $subtotal;
 
                 $detailData = [
                     'id_pesanan' => $pesanan->id_pesanan,
-                    'id_produk' => $item['id_produk'],
+                    'id_produk' => $produk->id_produk,
                     'jumlah' => $item['jumlah'],
-                    'harga' => $item['harga_satuan'],
+                    'harga' => $harga,
                     'subtotal' => $subtotal,
                     'topping' => $item['topping'] ?? null,
                     'gula' => $item['gula'] ?? null,
@@ -86,12 +108,10 @@ class PesananController extends Controller
                 DetailPesanan::create($detailData);
             }
 
+            $pesanan->update(['total_harga' => $totalHarga]);
+
             return $pesanan;
         });
-
-        return (new PesananResource($pesanan->load(['meja', 'detailPesanan.produk'])))
-            ->response()
-            ->setStatusCode(201);
     }
 
     public function update_status(Request $request, Pesanan $pesanan): PesananResource
@@ -100,9 +120,24 @@ class PesananController extends Controller
             'status_pesanan' => ['required', Rule::in(['menunggu', 'diproses', 'selesai', 'batal'])],
         ]);
 
-        $pesanan->update([
-            'status_pesanan' => $validated['status_pesanan'],
-        ]);
+        $statusBaru = $validated['status_pesanan'];
+        $statusLama = $pesanan->status_pesanan;
+
+        // Pesanan yang sudah batal tidak boleh diubah lagi
+        // (mencegah stok dikembalikan dua kali).
+        if ($statusLama === 'batal' && $statusBaru !== 'batal') {
+            throw ValidationException::withMessages([
+                'status_pesanan' => ['Pesanan yang sudah dibatalkan tidak dapat diubah.'],
+            ]);
+        }
+
+        DB::transaction(function () use ($pesanan, $statusBaru, $statusLama) {
+            if ($statusBaru === 'batal' && $statusLama !== 'batal') {
+                $this->kembalikanStok($pesanan);
+            }
+
+            $pesanan->update(['status_pesanan' => $statusBaru]);
+        });
 
         return new PesananResource($pesanan->load(['meja', 'detailPesanan.produk']));
     }
@@ -111,15 +146,7 @@ class PesananController extends Controller
     {
         DB::transaction(function () use ($pesanan) {
             if ($pesanan->status_pesanan !== 'batal') {
-                $pesanan->load('detailPesanan');
-
-                foreach ($pesanan->detailPesanan as $detail) {
-                    $stok = Stok::where('id_produk', $detail->id_produk)->lockForUpdate()->first();
-
-                    if ($stok) {
-                        $stok->increment('jumlah_stok', $detail->jumlah);
-                    }
-                }
+                $this->kembalikanStok($pesanan);
 
                 $pesanan->update([
                     'status_pesanan' => 'batal',
@@ -172,6 +199,22 @@ class PesananController extends Controller
                 'pembayaran' => $resource['pembayaran'] ?? null,
             ],
         ]);
+    }
+
+    /**
+     * Kembalikan stok semua item pada pesanan (dipakai saat pesanan dibatalkan).
+     */
+    private function kembalikanStok(Pesanan $pesanan): void
+    {
+        $pesanan->loadMissing('detailPesanan');
+
+        foreach ($pesanan->detailPesanan as $detail) {
+            $stok = Stok::where('id_produk', $detail->id_produk)->lockForUpdate()->first();
+
+            if ($stok) {
+                $stok->increment('jumlah_stok', $detail->jumlah);
+            }
+        }
     }
 
     private function generateNomorAntrean(): string

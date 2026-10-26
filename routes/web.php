@@ -33,7 +33,7 @@ Route::get('/status', [CustomerController::class, 'status'])->name('status');
 | (beserta PreviewController) saat backend & desain final siap.
 */
 
-Route::get('/login', [PreviewController::class, 'login'])->name('preview.login');
+Route::get('/login', [PreviewController::class, 'login'])->name('login');
 
 Route::get('/preview/manager', [PreviewController::class, 'manager'])->name('preview.manager');
 
@@ -58,7 +58,7 @@ Route::get('/preview/manager/reports', [PreviewController::class, 'managerReport
 Route::get('/preview/manager/finance', [PreviewController::class, 'managerFinance'])->name('preview.manager.finance');
 Route::get('/preview/manager/export', [PreviewController::class, 'managerExport'])->name('preview.manager.export');
 
-Route::post('/login', [WebAuthController::class, 'login'])->name('login.attempt');
+Route::post('/login', [WebAuthController::class, 'login'])->middleware('throttle:5,1')->name('login.attempt');
 Route::post('/logout', [WebAuthController::class, 'logout'])->name('logout');
 
 Route::middleware(['auth', 'role:admin'])->group(function () {
