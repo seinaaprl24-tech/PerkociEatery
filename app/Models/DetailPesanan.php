@@ -27,6 +27,11 @@ class DetailPesanan extends Model
         'gula',
         'es',
         'catatan',
+        'customisasi',
+    ];
+
+    protected $casts = [
+        'customisasi' => 'array',
     ];
 
     public function pesanan()
@@ -39,3 +44,4 @@ class DetailPesanan extends Model
         return $this->belongsTo(Produk::class, 'id_produk', 'id_produk');
     }
 }
+

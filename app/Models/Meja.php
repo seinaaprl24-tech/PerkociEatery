@@ -21,6 +21,7 @@ class Meja extends Model
         'no_meja',
         'qr_code',
         'status',
+        'kode_qr',
     ];
 
     public function pesanan()
@@ -28,3 +29,4 @@ class Meja extends Model
         return $this->hasMany(Pesanan::class, 'id_meja', 'id_meja');
     }
 }
+

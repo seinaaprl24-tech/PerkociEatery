@@ -44,3 +44,4 @@ class Pesanan extends Model
         return $this->hasOne(Pembayaran::class, 'id_pesanan', 'id_pesanan');
     }
 }
+
