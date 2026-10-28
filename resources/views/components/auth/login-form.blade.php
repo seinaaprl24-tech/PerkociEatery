@@ -1,18 +1,23 @@
 @props([
-    'action' => url('/login'),
-    'emailLabel' => 'Email atau Username',
-    'emailPlaceholder' => 'nama@perkoci.id',
+    'action' => route('login.attempt'),
+    'emailLabel' => 'Username',
+    'emailPlaceholder' => 'Masukkan username',
     'submitLabel' => 'Masuk',
     'error' => null,
     'preview' => false,
 ])
 
+@php
+    // Error dari prop (jika ada) atau dari validasi/login backend.
+    $pesanError = $error ?: ($errors->first('username') ?: $errors->first('password'));
+@endphp
+
 <form method="POST" action="{{ $action }}" class="space-y-4" novalidate
     @if ($preview) data-preview-auth @endif>
     @csrf
 
-    @if ($error)
-        <x-auth.alert type="error">{{ $error }}</x-auth.alert>
+    @if ($pesanError)
+        <x-auth.alert type="error">{{ $pesanError }}</x-auth.alert>
     @elseif ($preview)
         <div data-login-alert-wrap class="hidden">
             <x-auth.alert type="error" tabindex="-1" data-login-alert>
@@ -22,8 +27,9 @@
     @endif
 
     <div>
-        <x-ui.field id="login-email" name="email" type="email" :label="$emailLabel" :placeholder="$emailPlaceholder"
-            icon="mail" required autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" />
+        <x-ui.field id="login-email" name="username" type="text" :label="$emailLabel" :placeholder="$emailPlaceholder"
+            icon="person" required autocomplete="username" autocapitalize="none" spellcheck="false"
+            :value="old('username')" />
 
         <p id="login-email-error" class="field-error hidden" role="alert"></p>
     </div>
@@ -48,7 +54,7 @@
 
         <p id="login-password-error" class="field-error hidden" role="alert"></p>
 
-        <a href="#" data-toast-message="Fitur belum tersedia di mode preview"
+        <a href="#" data-toast-message="Hubungi admin untuk mengatur ulang password"
             class="absolute right-0 top-0 rounded text-[11px] font-semibold text-cocoa/40 transition hover:text-brand focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40">
             Lupa password?
         </a>
