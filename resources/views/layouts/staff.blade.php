@@ -2,6 +2,9 @@
 
 @section('body')
     @php
+        use Illuminate\Support\Facades\Route;
+        use Illuminate\Support\Str;
+
         $staff = config('perkoci.staff');
         $roleKey = trim($__env->yieldContent('staff_role')) ?: 'kasir';
         $activeKey = trim($__env->yieldContent('active_nav')) ?: 'dashboard';
@@ -10,8 +13,26 @@
             $staff['nav'],
             fn ($item) => in_array($roleKey, $item['roles'] ?? [], true),
         ));
-        $user = $staff['user'];
+
+        // Pengguna yang sedang login (bukan data contoh lagi).
+        $authUser = auth()->user();
+        $displayName = $authUser?->nama ?: ($authUser?->username ?: 'Pengguna');
+        $user = [
+            'name' => $displayName,
+            'initials' => Str::of($displayName)
+                ->explode(' ')
+                ->filter()
+                ->take(2)
+                ->map(fn ($word) => Str::upper(Str::substr($word, 0, 1)))
+                ->implode(''),
+            'shift' => $authUser ? '@'.$authUser->username : '',
+        ];
     @endphp
+
+    {{-- Token API untuk JavaScript dashboard (dibuat saat login, dihapus saat logout) --}}
+    @push('head')
+        <meta name="api-token" content="{{ session('api_token') }}">
+    @endpush
 
     <div class="min-h-screen bg-cream">
 
@@ -52,10 +73,8 @@
                     @foreach ($navItems as $item)
                         @php
                             $isActive = $item['key'] === $activeKey;
-                            $routeName = $item['key'] === 'dashboard'
-                                ? 'preview.'.$roleKey
-                                : 'preview.'.$roleKey.'.'.$item['key'];
-                            $href = \Illuminate\Support\Facades\Route::has($routeName)
+                            $routeName = $roleKey.'.'.$item['key'];
+                            $href = Route::has($routeName)
                                 ? route($routeName)
                                 : ($item['href'] ?? '#');
                         @endphp
@@ -64,17 +83,11 @@
                             class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition {{ $isActive ? 'bg-brand text-white shadow-soft' : 'text-cocoa/70 hover:bg-sand' }}">
                             <span class="ms text-[20px] leading-none {{ $isActive ? 'ms-fill' : '' }}" aria-hidden="true">{{ $item['icon'] }}</span>
                             <span class="flex-1 truncate">{{ $item['label'] }}</span>
-
-                            @if (! empty($item['badge']))
-                                <span class="flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-extrabold leading-none {{ $isActive ? 'bg-white/20 text-white' : 'bg-danger text-white' }}">
-                                    {{ $item['badge'] }}
-                                </span>
-                            @endif
                         </a>
                     @endforeach
                 </nav>
 
-                {{-- Pengguna + slot footer --}}
+                {{-- Pengguna + tombol keluar --}}
                 <div class="border-t border-cocoa/10 p-3">
                     <div class="flex items-center gap-2.5 rounded-xl bg-sand/70 px-2.5 py-2">
                         <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand text-[11px] font-extrabold tracking-wide text-white">
@@ -86,6 +99,14 @@
                             <span class="mt-0.5 block truncate text-[10px] text-cocoa/45">{{ $user['shift'] }}</span>
                         </span>
                     </div>
+
+                    <form method="POST" action="{{ route('logout') }}" class="mt-2">
+                        @csrf
+                        <button type="submit" class="btn-secondary btn-sm w-full">
+                            <span class="ms text-[16px] leading-none" aria-hidden="true">logout</span>
+                            Keluar
+                        </button>
+                    </form>
 
                     @yield('sidebar_footer')
                 </div>
@@ -125,4 +146,94 @@
             </div>
         </div>
     </div>
+
+    {{-- Helper pemanggil API untuk halaman staff: StaffApi.request('GET', '/pesanan') --}}
+    @push('scripts')
+        <script>
+            window.StaffApi = (function () {
+                var meta = document.querySelector('meta[name="api-token"]');
+                var token = meta ? meta.getAttribute('content') : '';
+
+                function toast(message) {
+                    if (window.perkociToast) {
+                        window.perkociToast(message);
+                    }
+                }
+
+                function firstError(data) {
+                    if (data && data.errors) {
+                        for (var key in data.errors) {
+                            if (data.errors[key] && data.errors[key][0]) {
+                                return data.errors[key][0];
+                            }
+                        }
+                    }
+
+                    return (data && data.message) || 'Terjadi kesalahan. Coba lagi.';
+                }
+
+                function unauthorized() {
+                    var storeKey = 'staff_reload_at';
+                    var last = 0;
+
+                    try {
+                        last = Number(window.sessionStorage.getItem(storeKey) || 0);
+                    } catch (e) { /* abaikan */ }
+
+                    if (Date.now() - last > 10000) {
+                        try {
+                            window.sessionStorage.setItem(storeKey, String(Date.now()));
+                        } catch (e) { /* abaikan */ }
+
+                        window.location.reload();
+                    } else {
+                        window.location.href = '/login?expired=1';
+                    }
+                }
+
+                /* path diawali "/" tanpa "/api", contoh: '/pesanan' */
+                function request(method, path, body) {
+                    var options = {
+                        method: method,
+                        headers: {
+                            'Accept': 'application/json',
+                            'Authorization': 'Bearer ' + token
+                        }
+                    };
+
+                    if (body !== undefined && body !== null) {
+                        options.headers['Content-Type'] = 'application/json';
+                        options.body = JSON.stringify(body);
+                    }
+
+                    return fetch('/api' + path, options).then(function (response) {
+                        return response.json()
+                            .catch(function () { return {}; })
+                            .then(function (data) {
+                                if (response.status === 401) {
+                                    unauthorized();
+                                    throw new Error('Sesi berakhir.');
+                                }
+
+                                if (response.status === 403) {
+                                    toast('Kamu tidak punya akses untuk aksi ini.');
+                                    throw new Error('Tidak punya akses.');
+                                }
+
+                                if (!response.ok) {
+                                    var error = new Error(firstError(data));
+                                    error.status = response.status;
+                                    error.data = data;
+                                    throw error;
+                                }
+
+                                return data;
+                            });
+                    });
+                }
+
+                return { request: request };
+            })();
+        </script>
+    @endpush
 @endsection

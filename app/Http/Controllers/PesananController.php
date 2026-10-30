@@ -19,13 +19,27 @@ use Illuminate\Validation\ValidationException;
 
 class PesananController extends Controller
 {
-    public function index(): AnonymousResourceCollection
+    /**
+     * Daftar pesanan, terbaru dulu.
+     *
+     * Parameter opsional:
+     * - status   : satu atau beberapa status dipisah koma, mis. ?status=menunggu,diproses
+     * - per_page : jumlah per halaman, 1 sampai 100 (bawaan 10)
+     */
+    public function index(Request $request): AnonymousResourceCollection
     {
-        $pesanan = Pesanan::with(['meja', 'detailPesanan.produk'])
-            ->orderByDesc('id_pesanan')
-            ->paginate(10);
+        $query = Pesanan::with(['meja', 'detailPesanan.produk'])
+            ->orderByDesc('id_pesanan');
 
-        return PesananResource::collection($pesanan);
+        $status = $request->query('status');
+
+        if (is_string($status) && $status !== '') {
+            $query->whereIn('status_pesanan', array_filter(explode(',', $status)));
+        }
+
+        $perPage = min(max((int) $request->query('per_page', 10), 1), 100);
+
+        return PesananResource::collection($query->paginate($perPage)->withQueryString());
     }
 
     public function show(Pesanan $pesanan): PesananResource

@@ -8,14 +8,7 @@
 
         $table = config('perkoci.table');
         $menu = Perkoci::menu();
-        $totals = Perkoci::cartTotals();
-        $initialSelected = array_map(static function (array $item): array {
-            return [
-                'name' => $item['name'],
-                'price' => $item['price'],
-                'qty' => $item['qty'] ?? 1,
-            ];
-        }, Perkoci::cartItems());
+        $catalog = Perkoci::catalog($menu);
     @endphp
 
     <div class="px-4 pt-4">
@@ -77,14 +70,19 @@
                             {{ $item['description'] ?: Perkoci::categoryName($item['category']) }}
                         </p>
 
+                        @unless ($item['available'])
+                            <span class="pill-sm mt-1.5 w-fit bg-danger/10 text-danger">Habis</span>
+                        @endunless
+
                         <div class="mt-auto flex items-center justify-between gap-2 pt-2">
                             <p class="font-display text-[15px] font-bold text-brand">
                                 {{ Perkoci::rupiah($item['price']) }}
                                 <span class="text-[10px] font-semibold text-cocoa/40">/ {{ $item['unit'] ?? 'porsi' }}</span>
                             </p>
 
-                            <button type="button" data-add="{{ $item['name'] }}" data-price="{{ $item['price'] }}"
-                                class="no-tap-highlight flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand text-xl font-bold leading-none text-white shadow-soft transition active:scale-90"
+                            <button type="button" data-add="{{ $item['id'] }}"
+                                @disabled(! $item['available'])
+                                class="no-tap-highlight flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand text-xl font-bold leading-none text-white shadow-soft transition active:scale-90 disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
                                 aria-label="Tambah {{ $item['name'] }}">
                                 +
                             </button>
@@ -95,7 +93,7 @@
         </div>
 
         {{-- Kosong --}}
-        <div data-empty class="hidden py-14 text-center">
+        <div data-empty class="{{ empty($menu) ? '' : 'hidden' }} py-14 text-center">
             <span class="ms text-[40px] leading-none text-cocoa/20">search_off</span>
             <p class="mt-3 text-sm font-semibold text-cocoa/60">Menu tidak ditemukan</p>
             <p class="mt-1 text-xs text-cocoa/40">Coba kata kunci atau kategori lain ya.</p>
@@ -107,10 +105,10 @@
         <div class="flex items-center justify-between gap-3 rounded-full bg-brand px-4 py-3 shadow-bar">
             <div class="min-w-0">
                 <p class="text-[9px] font-bold uppercase tracking-[0.16em] text-lime" data-selected-count>
-                    {{ $totals['count'] }} Item Dipilih
+                    0 Item Dipilih
                 </p>
                 <p class="font-display text-[15px] font-bold leading-tight text-white" data-selected-total>
-                    {{ Perkoci::rupiah($totals['total']) }}
+                    {{ Perkoci::rupiah(0) }}
                 </p>
             </div>
 
@@ -123,6 +121,8 @@
 @endsection
 
 @push('scripts')
+    @include('partials.cart-store')
+
     <script>
         (function () {
             var chips = Array.prototype.slice.call(document.querySelectorAll('[data-filter-chip]'));
@@ -133,19 +133,30 @@
             var countEl = document.querySelector('[data-selected-count]');
             var totalEl = document.querySelector('[data-selected-total]');
 
+            var catalog = @json($catalog);
             var activeCategory = 'all';
-            var selected = @json($initialSelected);
 
             function rupiah(value) {
                 return 'Rp ' + value.toLocaleString('id-ID');
             }
 
             function renderSelected() {
-                var total = selected.reduce(function (sum, item) {
-                    return sum + (item.price * (item.qty || 1));
-                }, 0);
+                var rows = PerkociCart.read();
+                var count = 0;
+                var total = 0;
 
-                countEl.textContent = selected.length + ' Item Dipilih';
+                rows.forEach(function (row) {
+                    var product = catalog[row.id];
+
+                    if (!product || !product.available) {
+                        return;
+                    }
+
+                    count++;
+                    total += product.price * Math.min(row.qty, product.stock);
+                });
+
+                countEl.textContent = count + ' Item Dipilih';
                 totalEl.textContent = rupiah(total);
             }
 
@@ -202,17 +213,20 @@
 
             document.querySelectorAll('[data-add]').forEach(function (button) {
                 button.addEventListener('click', function () {
-                    var name = button.getAttribute('data-add');
-                    var price = parseInt(button.getAttribute('data-price'), 10);
-                    var found = selected.filter(function (item) { return item.name === name; })[0];
+                    var id = parseInt(button.getAttribute('data-add'), 10);
+                    var product = catalog[id];
 
-                    if (found) {
-                        found.qty = (found.qty || 1) + 1;
-                    } else {
-                        selected.push({ name: name, price: price, qty: 1 });
+                    if (!product || !product.available) {
+                        return;
                     }
 
+                    var added = PerkociCart.add(id, product.stock);
+
                     renderSelected();
+
+                    if (!added && window.perkociToast) {
+                        window.perkociToast('Stok ' + product.name + ' hanya ' + product.stock + '.');
+                    }
 
                     button.animate(
                         [{ transform: 'scale(1)' }, { transform: 'scale(0.82)' }, { transform: 'scale(1)' }],

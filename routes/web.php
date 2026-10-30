@@ -1,8 +1,8 @@
 <?php
 
 use App\Http\Controllers\CustomerController;
-use App\Http\Controllers\PreviewController;
 use App\Http\Controllers\Web\AuthController as WebAuthController;
+use App\Http\Controllers\Web\StaffPageController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -29,7 +29,7 @@ Route::get('/status', [CustomerController::class, 'status'])->name('status');
 | bisa mengarahkan user yang belum login ke halaman ini.
 */
 
-Route::get('/login', [PreviewController::class, 'login'])->name('login');
+Route::get('/login', [WebAuthController::class, 'showLogin'])->name('login');
 
 Route::post('/login', [WebAuthController::class, 'login'])
     ->middleware('throttle:5,1')
@@ -39,52 +39,34 @@ Route::post('/logout', [WebAuthController::class, 'logout'])->name('logout');
 
 /*
 |--------------------------------------------------------------------------
-| Dashboard staff (wajib login + role)
+| Halaman staff (wajib login + role yang sesuai)
 |--------------------------------------------------------------------------
-*/
-
-Route::middleware(['auth', 'role:admin'])->group(function () {
-    Route::get('/admin', [PreviewController::class, 'admin'])->name('admin.dashboard');
-});
-
-Route::middleware(['auth', 'role:kasir'])->group(function () {
-    Route::get('/kasir', [PreviewController::class, 'kasir'])->name('kasir.dashboard');
-});
-
-Route::middleware(['auth', 'role:manager'])->group(function () {
-    Route::get('/manager', [PreviewController::class, 'manager'])->name('manager.dashboard');
-});
-
-/*
-|--------------------------------------------------------------------------
-| PREVIEW ONLY — kerangka UI staff (Tahap 2)
-|--------------------------------------------------------------------------
-| TEMPORARY – hapus saat auth/backend siap, jangan dipublikasikan ke produksi.
+| Belum login   -> diarahkan ke /login
+| Role tidak cocok -> 403
 |
-| Route GET sementara untuk melihat tampilan. Bukan autentikasi sungguhan,
-| tidak memakai middleware, dan tidak membuat sesi login. Hapus bagian ini
-| (beserta PreviewController) saat backend & desain final siap.
+| Nama route: {role}.dashboard dan {role}.{halaman}, mis. kasir.orders.
 */
 
-Route::get('/preview/manager', [PreviewController::class, 'manager'])->name('preview.manager');
+$staffPages = [
+    'kasir' => ['orders', 'payments', 'tables'],
+    'admin' => ['menu', 'tables', 'inventory', 'users', 'settings'],
+    'manager' => ['reports', 'finance', 'export'],
+];
 
-Route::get('/preview/kasir', [PreviewController::class, 'kasir'])->name('preview.kasir');
+foreach ($staffPages as $role => $pages) {
+    Route::middleware(['auth', 'role:'.$role])
+        ->prefix($role)
+        ->name($role.'.')
+        ->group(function () use ($role, $pages) {
+            Route::get('/', [StaffPageController::class, 'dashboard'])
+                ->defaults('role', $role)
+                ->name('dashboard');
 
-Route::get('/preview/admin', [PreviewController::class, 'admin'])->name('preview.admin');
-
-// TEMPORARY – hapus saat auth/backend siap, jangan dipublikasikan ke produksi.
-Route::get('/preview/kasir/orders', [PreviewController::class, 'kasirOrders'])->name('preview.kasir.orders');
-Route::get('/preview/kasir/payments', [PreviewController::class, 'kasirPayments'])->name('preview.kasir.payments');
-Route::get('/preview/kasir/tables', [PreviewController::class, 'kasirTables'])->name('preview.kasir.tables');
-
-// TEMPORARY – hapus saat auth/backend siap, jangan dipublikasikan ke produksi.
-Route::get('/preview/admin/menu', [PreviewController::class, 'adminMenu'])->name('preview.admin.menu');
-Route::get('/preview/admin/tables', [PreviewController::class, 'adminTables'])->name('preview.admin.tables');
-Route::get('/preview/admin/inventory', [PreviewController::class, 'adminInventory'])->name('preview.admin.inventory');
-Route::get('/preview/admin/users', [PreviewController::class, 'adminUsers'])->name('preview.admin.users');
-Route::get('/preview/admin/settings', [PreviewController::class, 'adminSettings'])->name('preview.admin.settings');
-
-// TEMPORARY – hapus saat auth/backend siap, jangan dipublikasikan ke produksi.
-Route::get('/preview/manager/reports', [PreviewController::class, 'managerReports'])->name('preview.manager.reports');
-Route::get('/preview/manager/finance', [PreviewController::class, 'managerFinance'])->name('preview.manager.finance');
-Route::get('/preview/manager/export', [PreviewController::class, 'managerExport'])->name('preview.manager.export');
+            foreach ($pages as $page) {
+                Route::get('/'.$page, [StaffPageController::class, 'page'])
+                    ->defaults('role', $role)
+                    ->defaults('page', $page)
+                    ->name($page);
+            }
+        });
+}
