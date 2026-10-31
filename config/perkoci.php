@@ -465,7 +465,7 @@ return [
             ],
             [
                 'key' => 'inventory',
-                'label' => 'Stok & Bahan',
+                'label' => 'Stok Produk',
                 'icon' => 'inventory_2',
                 'href' => '#',
                 'roles' => ['admin'],
