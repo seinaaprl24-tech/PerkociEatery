@@ -27,6 +27,7 @@ class UpdateProdukRequest extends FormRequest
             'kategori' => ['sometimes', 'required', 'string', 'max:255'],
             'harga' => ['sometimes', 'required', 'numeric', 'min:0'],
             'deskripsi' => ['nullable', 'string'],
+            'foto' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'status' => ['sometimes', 'required', Rule::in(['aktif', 'nonaktif'])],
         ];
     }

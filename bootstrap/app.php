@@ -17,7 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prepend(HandleCors::class);
         $middleware->alias([
             'role' => \App\Http\Middleware\EnsureUserHasRole::class,
-        $middleware->web(append: [\App\Http\Middleware\ResolveCustomerTable::class]);
+        $middleware->web(append: [\App\Http\Middleware\ResolveCustomerTable::class]),
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

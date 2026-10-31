@@ -6,6 +6,7 @@ use App\Http\Requests\StoreMejaRequest;
 use App\Http\Requests\UpdateMejaRequest;
 use App\Http\Resources\MejaResource;
 use App\Models\Meja;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Str;
@@ -51,7 +52,19 @@ class MejaController extends Controller
 
     public function destroy(Meja $meja): JsonResponse
     {
-        $meja->delete();
+        try {
+            $meja->delete();
+        } catch (QueryException $e) {
+            // 23000 = pelanggaran foreign key (meja sudah punya riwayat pesanan).
+            if ((string) $e->getCode() !== '23000') {
+                throw $e;
+            }
+
+            return response()->json([
+                'message' => 'Meja tidak dapat dihapus karena sudah memiliki riwayat pesanan.',
+            ], 409);
+        }
+
         return response()->json(['message' => 'Meja berhasil dihapus.']);
     }
 

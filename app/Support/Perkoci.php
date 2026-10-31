@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Produk;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
@@ -95,7 +96,9 @@ class Perkoci
                 'description' => $description !== '' ? $description : (string) ($fallback['description'] ?? ''),
                 'category' => $category,
                 'unit' => $fallback['unit'] ?? ($category === 'minuman' ? 'gelas' : 'porsi'),
-                'image' => self::imagePath($slug) ?? self::imagePath($alias),
+                'image' => $produk->foto
+                    ? Storage::disk('public')->url($produk->foto)
+                    : (self::imagePath($slug) ?? self::imagePath($alias)),
                 'stock' => $stock,
                 'available' => $stock > 0,
                 '_position' => $order[$slug] ?? $order[$alias] ?? (1000 + (int) $produk->id_produk),
