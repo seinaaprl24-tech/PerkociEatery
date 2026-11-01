@@ -248,9 +248,110 @@
                 }
             });
 
+<<<<<<< Updated upstream
             document.querySelector('[data-submit]').addEventListener('click', function () {
                 this.textContent = 'Pesanan Terkirim ke Dapur ✓';
                 this.classList.add('bg-brand-dark');
+=======
+            function setBusy(state) {
+                busy = state;
+                submitBtn.disabled = state || !tableId;
+                submitLabelEl.textContent = state ? 'Mengirim pesanan…' : 'Kirim Pesanan ke Dapur';
+                submitSepEl.classList.toggle('hidden', state);
+                submitTotalEl.classList.toggle('hidden', state);
+            }
+
+            submitBtn.addEventListener('click', function () {
+                var items = lines();
+
+                if (busy || items.length === 0) {
+                    return;
+                }
+
+                hideError();
+
+                if (!tableId) {
+                    showError('Meja belum terdeteksi. Scan QR di meja kamu dulu.');
+
+                    return;
+                }
+
+                var nameEl = document.getElementById('customer-name');
+                var phoneEl = document.getElementById('customer-phone');
+                var name = nameEl ? nameEl.value.trim() : '';
+                var phone = phoneEl ? phoneEl.value.trim() : '';
+
+                if (nameRequired && !name) {
+                    showError('Isi nama pemesan dulu ya.');
+
+                    if (nameEl) {
+                        nameEl.focus();
+                    }
+
+                    return;
+                }
+
+                setBusy(true);
+
+                fetch('/api/pesanan', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        id_meja: tableId,
+                        nama_pemesan: name,
+                        no_whatsapp: phone,
+                        items: items.map(function (line) {
+                            return { id_produk: line.product.id, jumlah: line.qty };
+                        })
+                    })
+                })
+                    .then(function (response) {
+                        return response.json()
+                            .catch(function () { return {}; })
+                            .then(function (body) {
+                                return { ok: response.ok, status: response.status, body: body };
+                            });
+                    })
+                    .then(function (result) {
+                        if (!result.ok) {
+                            showError(messageFrom(result.status, result.body));
+
+                            return;
+                        }
+
+                        var order = (result.body && result.body.data) || {};
+
+                        try {
+                            window.localStorage.setItem('perkoci_last_order', JSON.stringify({
+                                id: order.id_pesanan,
+                                nomor: order.nomor_antrean,
+                                total: order.total_harga,
+                                kode: order.kode_akses,
+                                at: Date.now()
+                            }));
+                        } catch (e) {
+                            /* abaikan jika penyimpanan ditolak */
+                        }
+
+                        PerkociCart.clear();
+                        sent = true;
+
+                        successEl.querySelector('[data-success-queue]').textContent = order.nomor_antrean || '-';
+                        successEl.querySelector('[data-success-total]').textContent = rupiah(Number(order.total_harga) || 0);
+                        successEl.classList.remove('hidden');
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    })
+                    .catch(function () {
+                        showError('Tidak bisa terhubung ke server. Coba lagi sebentar.');
+                    })
+                    .then(function () {
+                        setBusy(false);
+                        render();
+                    });
+>>>>>>> Stashed changes
             });
 
             render();

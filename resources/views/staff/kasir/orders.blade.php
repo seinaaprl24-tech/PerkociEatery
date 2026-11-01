@@ -57,6 +57,7 @@
 
         @if ($rows->isEmpty())
             <x-ui.empty-state icon="receipt_long" title="Tidak ada pesanan"
+<<<<<<< Updated upstream
                 description="Tidak ada pesanan contoh dengan status ini." />
         @else
             <x-ui.table class="rounded-none border-0"
@@ -80,6 +81,17 @@
                 @endforeach
             </x-ui.table>
         @endif
+=======
+                description="Belum ada pesanan dengan status ini." />
+        </div>
+
+        <x-ui.table data-orders-table class="rounded-none border-0"
+            :head="['Pesanan', 'Meja', 'Pelanggan', 'Menu', 'Item', 'Waktu', 'Total', 'Status', 'Aksi']">
+            <tr data-placeholder>
+                <td colspan="9" class="px-4 py-10 text-center text-sm text-cocoa/45">Memuat pesanan…</td>
+            </tr>
+        </x-ui.table>
+>>>>>>> Stashed changes
     </x-ui.section>
 
     {{-- TODO(figma): Kasir – Daftar Pesanan --}}
@@ -87,3 +99,145 @@
         Susunan kolom, filter status, dan aksi baris menunggu referensi Figma.
     </x-ui.design-note>
 @endsection
+<<<<<<< Updated upstream
+=======
+
+@push('scripts')
+    @include('partials.kasir-data')
+
+    <script>
+        window.addEventListener('DOMContentLoaded', function () {
+            var filter = @json($activeFilter);
+            var payUrl = @json(route('kasir.payments'));
+            var flashEl = document.querySelector('[data-flash]');
+            var tableWrap = document.querySelector('[data-orders-table]');
+            var tbody = tableWrap.querySelector('tbody');
+            var emptyEl = document.querySelector('[data-orders-empty]');
+            var rowCountEl = document.querySelector('[data-row-count]');
+            var newCountEl = document.querySelector('[data-new-count]');
+            var busy = false;
+
+            function changeStatus(order, status, trigger, successMessage) {
+                if (busy) {
+                    return;
+                }
+
+                busy = true;
+                trigger.disabled = true;
+                Kasir.hideFlash(flashEl);
+
+                Kasir.setStatus(order.id_pesanan, status)
+                    .then(function () {
+                        Kasir.flash(flashEl, 'success', successMessage);
+
+                        return refresh();
+                    })
+                    .catch(function (error) {
+                        Kasir.flash(flashEl, 'error', error.message);
+                    })
+                    .then(function () {
+                        busy = false;
+                        trigger.disabled = false;
+                    });
+            }
+
+            function cell(className, text) {
+                return Kasir.make('td', className, text);
+            }
+
+            function row(order) {
+                var tr = document.createElement('tr');
+
+                tr.appendChild(cell('font-semibold text-cocoa', order.nomor_antrean));
+                tr.appendChild(cell('whitespace-nowrap', Kasir.tableLabel(order)));
+                tr.appendChild(cell('whitespace-nowrap', Kasir.customer(order) || '—'));
+                tr.appendChild(cell('min-w-[220px] text-cocoa/70', Kasir.menuSummary(order)));
+                tr.appendChild(cell('whitespace-nowrap', Kasir.itemCount(order) + ' item'));
+                tr.appendChild(cell('whitespace-nowrap', Kasir.ago(order.tanggal_pesan)));
+                tr.appendChild(cell('whitespace-nowrap font-semibold text-cocoa', Kasir.rupiah(order.total_harga)));
+
+                var statusCell = cell('');
+                var meta = Kasir.statusMeta(order.status_pesanan);
+                statusCell.appendChild(Kasir.badge(meta.tone, meta.label));
+                tr.appendChild(statusCell);
+
+                var actionCell = cell('');
+                var actions = Kasir.make('div', 'flex flex-wrap items-center gap-1.5');
+
+                if (order.status_pesanan === 'menunggu') {
+                    var processBtn = Kasir.button('Proses', 'btn-secondary btn-sm', function () {
+                        changeStatus(order, 'diproses', processBtn, 'Pesanan ' + order.nomor_antrean + ' mulai diproses.');
+                    });
+                    actions.appendChild(processBtn);
+                }
+
+                if (Kasir.isActive(order)) {
+                    actions.appendChild(Kasir.link('Bayar', 'btn-primary btn-sm', payUrl + '?pesanan=' + order.id_pesanan));
+
+                    var cancelBtn = Kasir.button('Batalkan', 'btn-danger btn-sm', function () {
+                        if (window.confirm('Batalkan pesanan ' + order.nomor_antrean + '? Stok akan dikembalikan.')) {
+                            changeStatus(order, 'batal', cancelBtn, 'Pesanan ' + order.nomor_antrean + ' dibatalkan.');
+                        }
+                    });
+                    actions.appendChild(cancelBtn);
+                } else {
+                    actions.appendChild(Kasir.make('span', 'text-[11px] text-cocoa/35', '—'));
+                }
+
+                actionCell.appendChild(actions);
+                tr.appendChild(actionCell);
+
+                return tr;
+            }
+
+            function render(orders) {
+                var counts = { all: orders.length, menunggu: 0, diproses: 0, selesai: 0, batal: 0 };
+                var value = 0;
+
+                orders.forEach(function (order) {
+                    if (counts[order.status_pesanan] !== undefined) {
+                        counts[order.status_pesanan]++;
+                    }
+
+                    if (order.status_pesanan !== 'batal') {
+                        value += Number(order.total_harga) || 0;
+                    }
+                });
+
+                document.querySelectorAll('[data-count]').forEach(function (node) {
+                    node.textContent = counts[node.getAttribute('data-count')] || 0;
+                });
+
+                Kasir.setStat('total', orders.length);
+                Kasir.setStat('nilai', Kasir.rupiah(value));
+                Kasir.setStat('baru', counts.menunggu);
+                newCountEl.textContent = counts.menunggu;
+
+                var rows = filter === 'all' ? orders : orders.filter(function (order) {
+                    return order.status_pesanan === filter;
+                });
+
+                rowCountEl.textContent = rows.length;
+                Kasir.clear(tbody);
+                rows.forEach(function (order) {
+                    tbody.appendChild(row(order));
+                });
+
+                emptyEl.classList.toggle('hidden', rows.length > 0);
+                tableWrap.classList.toggle('hidden', rows.length === 0);
+            }
+
+            function refresh() {
+                return Kasir.loadOrders()
+                    .then(render)
+                    .catch(function (error) {
+                        Kasir.flash(flashEl, 'error', 'Gagal memuat pesanan: ' + error.message);
+                    });
+            }
+
+            refresh();
+            Kasir.every(refresh, 20000);
+        });
+    </script>
+@endpush
+>>>>>>> Stashed changes

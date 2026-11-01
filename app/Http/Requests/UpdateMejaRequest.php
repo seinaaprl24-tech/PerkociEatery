@@ -16,8 +16,6 @@ class UpdateMejaRequest extends FormRequest
     }
 
     /**
-     * Get the validation rules that apply to the request.
-     *
      * @return array<string, mixed>
      */
     public function rules(): array
@@ -25,9 +23,25 @@ class UpdateMejaRequest extends FormRequest
         $meja = $this->route('meja');
 
         return [
-            'no_meja' => ['sometimes', 'required', 'string', 'max:50', Rule::unique('meja', 'no_meja')->ignore($meja)],
-            'qr_code' => ['sometimes', 'required', 'string', 'max:255', Rule::unique('meja', 'qr_code')->ignore($meja)],
-            'status' => ['sometimes', 'required', Rule::in(['tersedia', 'terisi', 'reserved'])],
+            'no_meja' => [
+                'sometimes',
+                'required',
+                'string',
+                'max:20',
+                Rule::unique('meja', 'no_meja')->ignore($meja?->id_meja, 'id_meja'),
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'no_meja.required' => 'Nomor meja wajib diisi.',
+            'no_meja.unique' => 'Nomor meja ini sudah dipakai.',
+            'no_meja.max' => 'Nomor meja maksimal 20 karakter.',
         ];
     }
 }

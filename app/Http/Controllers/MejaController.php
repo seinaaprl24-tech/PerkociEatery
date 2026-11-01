@@ -15,6 +15,7 @@ class MejaController extends Controller
     public function index(): AnonymousResourceCollection
     {
         $meja = Meja::orderBy('no_meja')->paginate(10);
+
         return MejaResource::collection($meja);
     }
 
@@ -23,29 +24,27 @@ class MejaController extends Controller
         return new MejaResource($meja);
     }
 
+    /**
+     * Tambah meja. Kode QR dibuat otomatis dari nomor meja dan status awalnya "tersedia".
+     */
     public function store(StoreMejaRequest $request): JsonResponse
     {
         $data = $request->validated();
-        if (empty($data['kode_qr'])) {
-            $data['kode_qr'] = $this->generateKodeQr($data['no_meja'] ?? null);
-        }
-        if (empty($data['qr_code']) && ! empty($data['kode_qr'])) {
-            $data['qr_code'] = $data['kode_qr'];
-        }
+        $data['qr_code'] = $this->generateQrCode($data['no_meja']);
+        $data['status'] = 'tersedia';
+
         $meja = Meja::create($data);
+
         return (new MejaResource($meja))->response()->setStatusCode(201);
     }
 
+    /**
+     * Ubah nomor meja. Kode QR tidak berubah, jadi QR yang sudah dicetak tetap berlaku.
+     */
     public function update(UpdateMejaRequest $request, Meja $meja): MejaResource
     {
-        $data = $request->validated();
-        if (array_key_exists('kode_qr', $data) && empty($data['kode_qr'])) {
-            $data['kode_qr'] = $this->generateKodeQr($data['no_meja'] ?? $meja->no_meja);
-        }
-        if (array_key_exists('qr_code', $data) && empty($data['qr_code']) && ! empty($data['kode_qr'])) {
-            $data['qr_code'] = $data['kode_qr'];
-        }
-        $meja->update($data);
+        $meja->update($request->validated());
+
         return new MejaResource($meja);
     }
 
@@ -57,19 +56,24 @@ class MejaController extends Controller
 
     public function validateQR($kode_qr): JsonResponse
     {
-        $meja = Meja::where('kode_qr', $kode_qr)->orWhere('qr_code', $kode_qr)->first();
+        $meja = Meja::where('qr_code', $kode_qr)->first();
+
         if (! $meja) {
             return response()->json(['message' => 'Meja tidak ditemukan atau QR tidak valid.'], 404);
         }
+
         return response()->json(['status' => 'success', 'data' => new MejaResource($meja)]);
     }
 
-    private function generateKodeQr($noMeja = null): string
+    private function generateQrCode(string $noMeja): string
     {
-        $prefix = $noMeja ? 'MEJA-' . str_replace(' ', '', $noMeja) : 'MEJA';
-        do {
-            $kode = $prefix . '-QR' . strtoupper(Str::random(6));
-        } while (Meja::where('kode_qr', $kode)->orWhere('qr_code', $kode)->exists());
+        $base = 'MEJA-'.Str::upper(Str::slug($noMeja, ''));
+        $kode = $base;
+
+        while (Meja::where('qr_code', $kode)->exists()) {
+            $kode = $base.'-'.Str::upper(Str::random(4));
+        }
+
         return $kode;
     }
 }
