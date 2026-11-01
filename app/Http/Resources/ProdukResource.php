@@ -2,8 +2,11 @@
 
 namespace App\Http\Resources;
 
+use App\Support\Perkoci;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class ProdukResource extends JsonResource
 {
@@ -20,13 +23,17 @@ class ProdukResource extends JsonResource
             'kategori' => $this->kategori,
             'harga' => (float) $this->harga,
             'deskripsi' => $this->deskripsi,
+            'foto' => $this->foto,
             'status' => $this->status,
-            'stok' => $this->whenLoaded('stok', fn () => [
+            'image' => $this->foto
+                ? Storage::disk('public')->url($this->foto)
+                : Perkoci::imagePath(Str::slug((string) $this->nama_produk)),
+            'stok' => $this->whenLoaded('stok', fn () => $this->stok ? [
                 'id_stok' => $this->stok->id_stok,
                 'jumlah_stok' => $this->stok->jumlah_stok,
                 'min_stok' => $this->stok->min_stok,
                 'updated_at' => $this->stok->updated_at,
-            ]),
+            ] : null),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

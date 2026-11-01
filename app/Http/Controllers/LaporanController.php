@@ -85,7 +85,7 @@ class LaporanController extends Controller
         $totalTransaksi = (clone $pesananSelesai)->count();
 
         $transaksi = (clone $pesananSelesai)
-            ->with(['meja', 'detailPesanan.produk', 'pembayaran'])
+            ->with(['meja', 'detailPesanan.produk', 'pembayaran.metodePembayaran'])
             ->orderByDesc('tanggal_pesan')
             ->get();
 

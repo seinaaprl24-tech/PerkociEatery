@@ -1,4 +1,5 @@
-{{-- TEMPORARY – hapus saat auth/backend siap, jangan dipublikasikan ke produksi. --}}
+{{-- Mode preview sudah dihapus. Komponen ini sengaja tidak menampilkan apa pun,
+     supaya halaman yang masih memanggil <x-ui.preview-banner> tidak error. --}}
 @props(['current' => null])
 
 <div {{ $attributes->merge(['class' => 'mb-5 flex flex-col gap-3 rounded-2xl border border-dashed border-cocoa/25 bg-butter/30 px-4 py-3 lg:flex-row lg:items-center lg:justify-between']) }}>

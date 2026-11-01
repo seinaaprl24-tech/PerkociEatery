@@ -27,6 +27,7 @@ class StoreProdukRequest extends FormRequest
             'kategori' => ['required', 'string', 'max:255'],
             'harga' => ['required', 'numeric', 'min:0'],
             'deskripsi' => ['nullable', 'string'],
+            'foto' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'status' => ['required', Rule::in(['aktif', 'nonaktif'])],
         ];
     }

@@ -49,7 +49,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('produk', ProdukController::class)->except(['index', 'show']);
         Route::apiResource('meja', MejaController::class)->except(['index', 'show']);
         Route::apiResource('users', UserController::class);
+        Route::patch('produk/{produk}/stok', [\App\Http\Controllers\StokController::class, 'update']);
     });
+
 
     // Manager & admin: laporan
     Route::middleware('role:manager,admin')->prefix('laporan')->group(function () {

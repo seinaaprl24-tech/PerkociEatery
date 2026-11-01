@@ -1,5 +1,4 @@
-{{-- TEMPORARY – hapus saat auth/backend siap, jangan dipublikasikan ke produksi. --}}
-{{-- TODO(figma): Kasir – Pembayaran & Cetak Struk --}}
+{{-- Kasir – Pembayaran & Cetak Struk: data nyata dari /api/pesanan dan /api/pembayaran. --}}
 @extends('layouts.staff')
 
 @section('title', $role['payment_page']['title'].' — Perkoci Eatery')
@@ -14,131 +13,160 @@
     </div>
 @endsection
 
+@push('head')
+    {{-- Saat mencetak, hanya struk yang tampil. --}}
+    <style>
+        @@media print {
+            body * { visibility: hidden; }
+            [data-receipt], [data-receipt] * { visibility: visible; }
+            [data-receipt] { position: absolute; left: 0; top: 0; width: 100%; border: 0; }
+        }
+    </style>
+@endpush
+
 @section('content')
     @php
         $page = $role['payment_page'];
-        $receipt = $role['receipt'];
-        $total = collect($receipt['items'])->sum(fn ($item) => $item['price'] * $item['qty']);
-        $cashReceived = $page['cash_received'];
-        $change = $cashReceived - $total;
+
+        $methods = [
+            ['value' => 'tunai', 'label' => 'Tunai', 'meta' => 'Uang tunai di kasir'],
+            ['value' => 'qris', 'label' => 'QRIS', 'meta' => 'Scan kode QRIS'],
+            ['value' => 'e-wallet', 'label' => 'E-Wallet', 'meta' => 'Transfer / dompet digital'],
+        ];
     @endphp
 
-    <x-ui.preview-banner current="kasir" />
+    <x-ui.page-header :title="$page['title']" :subtitle="$page['subtitle']" />
 
-    <x-ui.page-header :title="$page['title']" :subtitle="$page['subtitle']">
-        <x-ui.badge tone="butter" icon="science">Data Contoh</x-ui.badge>
-        <x-ui.badge tone="neutral" icon="payments">Tunai</x-ui.badge>
-    </x-ui.page-header>
+    <p data-flash class="hidden" role="status"></p>
 
     <div class="mt-5 grid gap-3 sm:grid-cols-3">
-        <x-ui.stat-card label="Total Tagihan" :value="\App\Support\Perkoci::rupiah($total)" icon="receipt_long" tone="brand" hint="dihitung dari item" />
-        <x-ui.stat-card label="Tunai Diterima" :value="\App\Support\Perkoci::rupiah($cashReceived)" icon="payments" tone="lime" hint="nominal contoh" />
-        <x-ui.stat-card label="Kembalian" :value="\App\Support\Perkoci::rupiah($change)" icon="price_check" tone="butter" hint="tunai - total" />
+        <x-ui.stat-card data-stat="total" label="Total Tagihan" value="Rp 0" icon="receipt_long" tone="brand"
+            hint="dari pesanan terpilih" />
+        <x-ui.stat-card data-stat="cash" label="Uang Diterima" value="Rp 0" icon="payments" tone="lime"
+            hint="nominal yang diisi kasir" />
+        <x-ui.stat-card data-stat="change" label="Kembalian" value="Rp 0" icon="price_check" tone="butter"
+            hint="diterima - total" />
     </div>
 
     <div class="mt-4 grid gap-4 xl:grid-cols-2">
-        <x-ui.section :title="$receipt['title']" :description="$receipt['description']">
-            <div class="rounded-xl border border-dashed border-cocoa/25 bg-white px-4 py-4 text-[11px]">
+        {{-- Struk --}}
+        <x-ui.section title="Pratinjau Struk" description="Isi struk mengikuti pesanan yang dipilih.">
+            <div data-receipt class="rounded-xl border border-dashed border-cocoa/25 bg-white px-4 py-4 text-[11px]">
                 <div class="text-center">
                     <p class="font-display text-[14px] font-bold text-cocoa">{{ config('perkoci.brand.name') }}</p>
-                    <p class="mt-1 text-[10px] leading-relaxed text-cocoa/45">
-                        {{ implode(' · ', $receipt['meta']) }}
-                    </p>
+                    <p class="mt-1 text-[10px] leading-relaxed text-cocoa/45" data-receipt-meta>Belum ada pesanan dipilih</p>
                 </div>
 
                 <div class="my-3 border-t border-dashed border-cocoa/20"></div>
 
-                <x-ui.table :head="['Item', 'Qty', 'Harga', 'Subtotal']" class="rounded-none border-0">
-                    @foreach ($receipt['items'] as $item)
-                        <tr>
-                            <td class="font-semibold text-cocoa">{{ $item['name'] }}</td>
-                            <td class="whitespace-nowrap">{{ $item['qty'] }}×</td>
-                            <td class="whitespace-nowrap">{{ \App\Support\Perkoci::rupiah($item['price']) }}</td>
-                            <td class="whitespace-nowrap font-semibold text-cocoa">
-                                {{ \App\Support\Perkoci::rupiah($item['price'] * $item['qty']) }}
-                            </td>
-                        </tr>
-                    @endforeach
-                </x-ui.table>
+                <ul class="space-y-1.5" data-receipt-items></ul>
 
                 <div class="my-3 border-t border-dashed border-cocoa/20"></div>
 
                 <dl class="space-y-1.5">
                     <div class="flex items-center justify-between">
                         <dt class="text-cocoa/55">Total</dt>
-                        <dd class="font-display text-[14px] font-bold text-cocoa">{{ \App\Support\Perkoci::rupiah($total) }}</dd>
+                        <dd class="font-display text-[14px] font-bold text-cocoa" data-receipt-total>Rp 0</dd>
                     </div>
                     <div class="flex items-center justify-between">
-                        <dt class="text-cocoa/55">Tunai</dt>
-                        <dd class="font-semibold text-cocoa">{{ \App\Support\Perkoci::rupiah($cashReceived) }}</dd>
+                        <dt class="text-cocoa/55" data-receipt-method>Tunai</dt>
+                        <dd class="font-semibold text-cocoa" data-receipt-cash>Rp 0</dd>
                     </div>
                     <div class="flex items-center justify-between border-t border-dashed border-cocoa/20 pt-1.5">
                         <dt class="font-bold text-cocoa">Kembalian</dt>
-                        <dd class="font-display text-[14px] font-bold text-brand">{{ \App\Support\Perkoci::rupiah($change) }}</dd>
+                        <dd class="font-display text-[14px] font-bold text-brand" data-receipt-change>Rp 0</dd>
                     </div>
                 </dl>
 
-                <p class="mt-3 text-center text-[9.5px] leading-relaxed text-cocoa/35">{{ $receipt['note'] }}</p>
+                <p class="mt-3 text-center text-[9.5px] leading-relaxed text-cocoa/35" data-receipt-note>
+                    Pilih pesanan di antrean untuk mulai pembayaran.
+                </p>
             </div>
         </x-ui.section>
 
         <div class="space-y-4">
-            <x-ui.section title="Ringkasan Pesanan" description="Contoh pesanan yang sedang dibayar.">
-                <dl class="space-y-2.5">
+            {{-- Pembayaran --}}
+            <x-ui.section title="Pembayaran" description="Konfirmasi pembayaran untuk pesanan yang dipilih.">
+                <div data-summary-empty>
+                    <x-ui.empty-state icon="payments" title="Belum ada pesanan dipilih"
+                        description="Pilih pesanan dari antrean pembayaran." />
+                </div>
+
+                <dl class="hidden space-y-2.5" data-summary>
                     <div class="flex items-center justify-between gap-3">
                         <dt class="text-xs text-cocoa/50">Nomor pesanan</dt>
-                        <dd class="text-xs font-bold text-cocoa">#PK-9821</dd>
+                        <dd class="text-xs font-bold text-cocoa" data-sum-number>-</dd>
                     </div>
                     <div class="flex items-center justify-between gap-3">
                         <dt class="text-xs text-cocoa/50">Meja</dt>
-                        <dd class="text-xs font-semibold text-cocoa">Meja 08</dd>
+                        <dd class="text-xs font-semibold text-cocoa" data-sum-table>-</dd>
                     </div>
                     <div class="flex items-center justify-between gap-3">
                         <dt class="text-xs text-cocoa/50">Jumlah item</dt>
-                        <dd class="text-xs font-semibold text-cocoa">{{ collect($receipt['items'])->sum('qty') }} item</dd>
-                    </div>
-                    <div class="flex items-center justify-between gap-3">
-                        <dt class="text-xs text-cocoa/50">Metode</dt>
-                        <dd><x-ui.badge tone="lime">Tunai</x-ui.badge></dd>
+                        <dd class="text-xs font-semibold text-cocoa" data-sum-items>-</dd>
                     </div>
                 </dl>
 
-                <div class="mt-4 flex flex-wrap gap-2">
-                    <button type="button" class="btn-primary"
-                        data-toast-message="Pembayaran belum terhubung pada mode preview.">
-                        Konfirmasi Pembayaran
-                    </button>
-                    <button type="button" class="btn-secondary"
-                        data-toast-message="Cetak struk belum terhubung pada mode preview.">
+                <form data-pay-form class="mt-4 hidden space-y-3" novalidate>
+                    <div>
+                        <p class="field-label">Metode Pembayaran</p>
+
+                        <div class="grid gap-2 sm:grid-cols-3">
+                            @foreach ($methods as $method)
+                                <label class="flex cursor-pointer items-start gap-2.5 rounded-xl border border-cocoa/10 bg-sand/70 px-3 py-2.5 transition has-[:checked]:border-brand/45 has-[:checked]:bg-brand/[0.06]">
+                                    <input type="radio" name="metode" value="{{ $method['value'] }}"
+                                        @checked($loop->first) class="mt-0.5 h-[16px] w-[16px] shrink-0 accent-brand">
+
+                                    <span class="min-w-0">
+                                        <span class="block text-[12.5px] font-semibold text-cocoa">{{ $method['label'] }}</span>
+                                        <span class="mt-0.5 block text-[10.5px] text-cocoa/50">{{ $method['meta'] }}</span>
+                                    </span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="field-label" for="pay-cash">Uang Diterima</label>
+                        <input id="pay-cash" data-pay-cash type="number" min="0" step="500" inputmode="numeric"
+                            class="field" placeholder="Masukkan nominal">
+                        <div class="mt-2 flex flex-wrap gap-1.5" data-quick-cash></div>
+                    </div>
+
+                    <button type="submit" class="btn-primary" data-pay-submit>Konfirmasi Pembayaran</button>
+                </form>
+
+                <div class="mt-4 hidden flex-wrap gap-2" data-after-pay>
+                    <button type="button" class="btn-secondary" data-print>
                         <span class="ms text-[16px] leading-none" aria-hidden="true">print</span>
                         Cetak Struk
                     </button>
+                    <button type="button" class="btn-ghost" data-next>Pesanan Berikutnya</button>
                 </div>
             </x-ui.section>
 
-            <x-ui.section title="Antrean Pembayaran" description="Contoh pesanan lain yang menunggu pembayaran.">
-                <ul class="space-y-2.5">
-                    @foreach ($role['payments']['rows'] as $row)
-                        <li class="flex items-center justify-between gap-3 rounded-xl border border-cocoa/10 px-3.5 py-3">
-                            <div class="min-w-0">
-                                <p class="text-xs font-bold text-cocoa">{{ $row['id'] }} · {{ $row['table'] }}</p>
-                                <p class="mt-0.5 text-[11px] text-cocoa/45">{{ $row['method'] }}</p>
-                            </div>
-                            <p class="shrink-0 font-display text-sm font-bold text-cocoa">{{ \App\Support\Perkoci::rupiah($row['total']) }}</p>
-                        </li>
-                    @endforeach
-                </ul>
+            {{-- Antrean pembayaran --}}
+            <x-ui.section title="Antrean Pembayaran" description="Pesanan aktif yang belum dibayar.">
+                <ul class="space-y-2.5" data-queue></ul>
+
+                <div data-queue-empty class="hidden">
+                    <x-ui.empty-state icon="receipt_long" title="Tidak ada antrean pembayaran"
+                        description="Semua pesanan aktif sudah dibayar." />
+                </div>
+            </x-ui.section>
+
+            {{-- Riwayat --}}
+            <x-ui.section title="Riwayat Pembayaran" description="10 pembayaran terakhir.">
+                <ul class="space-y-2.5" data-history></ul>
+
+                <div data-history-empty class="hidden">
+                    <x-ui.empty-state icon="history" title="Belum ada pembayaran"
+                        description="Pembayaran yang sudah diterima akan tampil di sini." />
+                </div>
             </x-ui.section>
         </div>
     </div>
-
-    {{-- TODO(figma): Kasir – Pembayaran & Cetak Struk --}}
-    <x-ui.design-note class="mt-4" title="Menunggu frame Figma: Kasir – Pembayaran & Cetak Struk">
-        Tata letak ringkasan pembayaran, nominal tunai, kembalian, dan preview struk menunggu Figma.
-    </x-ui.design-note>
 @endsection
-<<<<<<< Updated upstream
-=======
 
 @push('scripts')
     @include('partials.kasir-data')
@@ -517,4 +545,4 @@
         });
     </script>
 @endpush
->>>>>>> Stashed changes
+

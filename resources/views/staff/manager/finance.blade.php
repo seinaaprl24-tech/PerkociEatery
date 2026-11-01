@@ -1,5 +1,4 @@
-{{-- TEMPORARY – hapus saat auth/backend siap, jangan dipublikasikan ke produksi. --}}
-{{-- TODO(figma): Manager – Laporan Keuangan --}}
+{{-- Manager – Laporan Keuangan: pemasukan nyata dari /api/laporan/penjualan. Pengeluaran belum punya API. --}}
 @extends('layouts.staff')
 
 @section('title', $role['finance_page']['title'].' — Perkoci Eatery')
@@ -15,69 +14,194 @@
 @endsection
 
 @section('content')
-    @php
-        $page = $role['finance_page'];
-        $income = collect($page['income']);
-        $expenses = collect($page['expenses']);
-        $totalIncome = $income->sum('amount');
-        $totalExpenses = $expenses->sum('amount');
-        $net = $totalIncome - $totalExpenses;
-    @endphp
-
-    <x-ui.preview-banner current="manager" />
+    @php $page = $role['finance_page']; @endphp
 
     <x-ui.page-header :title="$page['title']" :subtitle="$page['subtitle']">
-        <x-ui.badge tone="butter" icon="science">Data Contoh</x-ui.badge>
+        <x-ui.badge tone="neutral" icon="calendar_month"><span data-period-label>Bulan Ini</span></x-ui.badge>
     </x-ui.page-header>
 
-    <div class="mt-5 grid gap-3 sm:grid-cols-3">
-        <x-ui.stat-card label="Total Pemasukan" :value="\App\Support\Perkoci::rupiah($totalIncome)" icon="south_west" tone="lime" hint="dihitung dari baris" />
-        <x-ui.stat-card label="Total Pengeluaran" :value="\App\Support\Perkoci::rupiah($totalExpenses)" icon="north_east" tone="danger" hint="dihitung dari baris" />
-        <x-ui.stat-card label="Saldo Bersih" :value="\App\Support\Perkoci::rupiah($net)" icon="account_balance_wallet" tone="brand" hint="pemasukan - pengeluaran" />
+    <p data-flash class="hidden" role="status"></p>
+
+    {{-- Pilih periode --}}
+    <x-ui.section class="mt-5" title="Periode" description="Pilih rentang tanggal. Maksimal 120 hari.">
+        <div class="flex flex-wrap gap-2" data-presets>
+            <button type="button" class="chip" data-preset="today" aria-pressed="false">Hari Ini</button>
+            <button type="button" class="chip" data-preset="7" aria-pressed="false">7 Hari</button>
+            <button type="button" class="chip" data-preset="30" aria-pressed="false">30 Hari</button>
+            <button type="button" class="chip chip-active" data-preset="month" aria-pressed="true">Bulan Ini</button>
+        </div>
+
+        <div class="mt-3 flex flex-wrap items-end gap-3">
+            <div class="w-full sm:w-44">
+                <label class="field-label" for="period-start">Dari</label>
+                <input id="period-start" type="date" class="field" data-start>
+            </div>
+            <div class="w-full sm:w-44">
+                <label class="field-label" for="period-end">Sampai</label>
+                <input id="period-end" type="date" class="field" data-end>
+            </div>
+            <button type="button" class="btn-primary btn-sm" data-apply>Terapkan</button>
+        </div>
+    </x-ui.section>
+
+    <div class="mt-4 grid gap-3 sm:grid-cols-3">
+        <x-ui.stat-card data-stat="income" label="Total Pemasukan" value="Rp 0" icon="south_west" tone="lime"
+            hint="pembayaran lunas, tanpa kembalian" />
+        <x-ui.stat-card data-stat="count" label="Jumlah Transaksi" value="0" icon="receipt_long" tone="brand"
+            hint="pada periode ini" />
+        <x-ui.stat-card data-stat="average" label="Rata-rata / Transaksi" value="Rp 0" icon="trending_up" tone="butter"
+            hint="pemasukan / transaksi" />
     </div>
 
     <div class="mt-4 grid gap-4 xl:grid-cols-2">
-        <x-ui.section :title="'Rincian Pemasukan'" description="Contoh pemasukan pada periode ini." flush>
-            <x-slot:actions>
-                <x-ui.badge tone="lime">{{ $income->count() }} baris</x-ui.badge>
-            </x-slot:actions>
-
-            <x-ui.table class="rounded-none border-0" :head="['Sumber', 'Nominal']">
-                @foreach ($page['income'] as $row)
-                    <tr>
-                        <td class="font-semibold text-cocoa">{{ $row['label'] }}</td>
-                        <td class="whitespace-nowrap font-semibold text-cocoa">{{ \App\Support\Perkoci::rupiah($row['amount']) }}</td>
-                    </tr>
-                @endforeach
-                <tr class="bg-sand/60">
-                    <td class="font-bold text-cocoa">Total Pemasukan</td>
-                    <td class="whitespace-nowrap font-bold text-cocoa">{{ \App\Support\Perkoci::rupiah($totalIncome) }}</td>
+        <x-ui.section title="Pemasukan per Metode Pembayaran" description="Nominal berdasarkan cara pembayaran." flush>
+            <x-ui.table data-method-table class="rounded-none border-0" :head="['Metode', 'Transaksi', 'Nominal']">
+                <tr data-placeholder>
+                    <td colspan="3" class="px-4 py-10 text-center text-sm text-cocoa/45">Memuat…</td>
                 </tr>
             </x-ui.table>
         </x-ui.section>
 
-        <x-ui.section title="Rincian Pengeluaran" description="Contoh pengeluaran pada periode ini." flush>
-            <x-slot:actions>
-                <x-ui.badge tone="danger">{{ $expenses->count() }} baris</x-ui.badge>
-            </x-slot:actions>
-
-            <x-ui.table class="rounded-none border-0" :head="['Keperluan', 'Nominal']">
-                @foreach ($page['expenses'] as $row)
-                    <tr>
-                        <td class="font-semibold text-cocoa">{{ $row['label'] }}</td>
-                        <td class="whitespace-nowrap font-semibold text-cocoa">{{ \App\Support\Perkoci::rupiah($row['amount']) }}</td>
-                    </tr>
-                @endforeach
-                <tr class="bg-sand/60">
-                    <td class="font-bold text-cocoa">Total Pengeluaran</td>
-                    <td class="whitespace-nowrap font-bold text-cocoa">{{ \App\Support\Perkoci::rupiah($totalExpenses) }}</td>
+        <x-ui.section title="Pemasukan per Hari" description="Total pemasukan setiap tanggal." flush>
+            <x-ui.table data-day-table class="rounded-none border-0" :head="['Tanggal', 'Transaksi', 'Nominal']">
+                <tr data-placeholder>
+                    <td colspan="3" class="px-4 py-10 text-center text-sm text-cocoa/45">Memuat…</td>
                 </tr>
             </x-ui.table>
         </x-ui.section>
     </div>
 
-    {{-- TODO(figma): Manager – Laporan Keuangan --}}
-    <x-ui.design-note class="mt-4" title="Menunggu frame Figma: Manager – Laporan Keuangan">
-        Pengelompokan pemasukan/pengeluaran dan kartu saldo menunggu referensi Figma.
-    </x-ui.design-note>
+    {{-- Pengeluaran --}}
+    <x-ui.section class="mt-4" title="Pengeluaran"
+        description="Pencatatan pengeluaran (bahan, gaji, operasional) belum tersedia.">
+        <x-ui.empty-state icon="receipt" title="Belum ada pencatatan pengeluaran"
+            description="Saldo bersih (pemasukan dikurangi pengeluaran) akan tampil setelah fitur pengeluaran dibuat." />
+    </x-ui.section>
 @endsection
+
+@push('scripts')
+    @include('partials.manager-data')
+
+    <script>
+        window.addEventListener('DOMContentLoaded', function () {
+            var flashEl = document.querySelector('[data-flash]');
+            var startInput = document.querySelector('[data-start]');
+            var endInput = document.querySelector('[data-end]');
+            var presetButtons = Array.prototype.slice.call(document.querySelectorAll('[data-preset]'));
+            var periodLabel = document.querySelector('[data-period-label]');
+            var methodBody = document.querySelector('[data-method-table] tbody');
+            var dayBody = document.querySelector('[data-day-table] tbody');
+            var PRESET_LABEL = { today: 'Hari Ini', '7': '7 Hari', '30': '30 Hari', month: 'Bulan Ini' };
+            var busy = false;
+
+            function markPreset(name) {
+                presetButtons.forEach(function (button) {
+                    var active = button.getAttribute('data-preset') === name;
+
+                    button.classList.toggle('chip-active', active);
+                    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+                });
+            }
+
+            function fillTable(body, rows, totals) {
+                Manager.clear(body);
+
+                rows.forEach(function (row) {
+                    var tr = document.createElement('tr');
+
+                    tr.appendChild(Manager.make('td', 'font-semibold text-cocoa', row.label));
+                    tr.appendChild(Manager.make('td', '', row.count));
+                    tr.appendChild(Manager.make('td', 'whitespace-nowrap font-semibold text-cocoa', Manager.rupiah(row.amount)));
+                    body.appendChild(tr);
+                });
+
+                if (rows.length === 0) {
+                    var empty = document.createElement('tr');
+                    var cell = Manager.make('td', 'px-4 py-10 text-center text-sm text-cocoa/45', 'Belum ada pemasukan pada periode ini.');
+                    cell.colSpan = 3;
+                    empty.appendChild(cell);
+                    body.appendChild(empty);
+
+                    return;
+                }
+
+                var total = document.createElement('tr');
+                total.className = 'bg-sand/60';
+                total.appendChild(Manager.make('td', 'font-bold text-cocoa', 'Total'));
+                total.appendChild(Manager.make('td', 'font-bold text-cocoa', totals.count));
+                total.appendChild(Manager.make('td', 'whitespace-nowrap font-bold text-cocoa', Manager.rupiah(totals.amount)));
+                body.appendChild(total);
+            }
+
+            function load(start, end, label) {
+                var problem = Manager.validRange(start, end);
+
+                if (problem) {
+                    Manager.flash(flashEl, 'error', problem);
+
+                    return;
+                }
+
+                if (busy) {
+                    return;
+                }
+
+                busy = true;
+                Manager.hideFlash(flashEl);
+                periodLabel.textContent = label;
+
+                Manager.loadSales(start, end)
+                    .then(function (sales) {
+                        var orders = sales.data || [];
+                        var count = Number(sales.total_transaksi) || 0;
+                        var income = Number(sales.total_pendapatan) || 0;
+
+                        Manager.setStat('income', Manager.rupiah(income));
+                        Manager.setStat('count', count);
+                        Manager.setStat('average', Manager.rupiah(count > 0 ? Math.round(income / count) : 0));
+
+                        var methods = Manager.byMethod(orders).map(function (row) {
+                            return { label: row.name, count: row.count, amount: row.amount };
+                        });
+
+                        var days = Manager.groupByDay(orders, start, end)
+                            .filter(function (day) { return day.orders > 0; })
+                            .map(function (day) {
+                                return { label: Manager.longDay(day.date), count: day.orders, amount: day.revenue };
+                            });
+
+                        fillTable(methodBody, methods, { count: count, amount: income });
+                        fillTable(dayBody, days, { count: count, amount: income });
+                    })
+                    .catch(function (error) {
+                        Manager.flash(flashEl, 'error', 'Gagal memuat laporan: ' + error.message);
+                    })
+                    .then(function () {
+                        busy = false;
+                    });
+            }
+
+            function usePreset(name) {
+                var range = Manager.presetRange(name);
+
+                startInput.value = range.start;
+                endInput.value = range.end;
+                markPreset(name);
+                load(range.start, range.end, PRESET_LABEL[name]);
+            }
+
+            presetButtons.forEach(function (button) {
+                button.addEventListener('click', function () {
+                    usePreset(button.getAttribute('data-preset'));
+                });
+            });
+
+            document.querySelector('[data-apply]').addEventListener('click', function () {
+                markPreset('');
+                load(startInput.value, endInput.value, Manager.longDay(startInput.value) + ' – ' + Manager.longDay(endInput.value));
+            });
+
+            usePreset('month');
+        });
+    </script>
+@endpush

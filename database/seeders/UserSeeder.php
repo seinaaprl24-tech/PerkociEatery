@@ -6,30 +6,39 @@ use App\Models\User;
 use Illuminate\Database\Seeder;
 
 /**
- * Akun staf (Admin, Kasir, Manager) untuk pengujian backend dan integrasi frontend.
- * Password diambil dari SEED_STAFF_PASSWORD, default "password".
+ * Akun staf (Admin, Kasir, Manager) dengan password masing-masing.
+ *
+ * Password dibaca dari .env (jangan ditulis di kode / di-commit):
+ *   SEED_ADMIN_PASSWORD, SEED_KASIR_PASSWORD, SEED_MANAGER_PASSWORD
+ * Jika kosong, dipakai SEED_STAFF_PASSWORD, lalu "password" (hanya untuk uji lokal).
+ *
+ * Menjalankan seeder ini lagi akan MENGATUR ULANG password ketiga akun
+ * sesuai nilai di .env.
  */
 class UserSeeder extends Seeder
 {
     public function run(): void
     {
-        $password = env('SEED_STAFF_PASSWORD', 'password');
+        $fallback = env('SEED_STAFF_PASSWORD', 'password');
 
         $staff = [
             [
                 'nama' => 'Admin Perkoci',
                 'username' => 'admin',
                 'role' => 'admin',
+                'password' => env('SEED_ADMIN_PASSWORD') ?: $fallback,
             ],
             [
                 'nama' => 'Kasir Perkoci',
                 'username' => 'kasir',
                 'role' => 'kasir',
+                'password' => env('SEED_KASIR_PASSWORD') ?: $fallback,
             ],
             [
                 'nama' => 'Manager Perkoci',
                 'username' => 'manager',
                 'role' => 'manager',
+                'password' => env('SEED_MANAGER_PASSWORD') ?: $fallback,
             ],
         ];
 
@@ -39,7 +48,7 @@ class UserSeeder extends Seeder
                 [
                     'nama' => $data['nama'],
                     'role' => $data['role'],
-                    'password' => $password,
+                    'password' => $data['password'],
                 ],
             );
         }

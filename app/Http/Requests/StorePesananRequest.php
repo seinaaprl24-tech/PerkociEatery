@@ -3,7 +3,6 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class StorePesananRequest extends FormRequest
 {
@@ -18,26 +17,26 @@ class StorePesananRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
+     * Catatan: harga TIDAK dipercaya dari client. Server selalu memakai harga
+     * dari tabel produk, jadi items.*.harga_satuan boleh dihilangkan (jika
+     * dikirim, nilainya diabaikan).
+     *
      * @return array<string, mixed>
      */
     public function rules(): array
     {
         return [
             'id_meja' => ['required', 'integer', 'exists:meja,id_meja'],
-<<<<<<< Updated upstream
             'items' => ['required', 'array', 'min:1'],
-=======
-            'nama_pemesan' => ['nullable', 'string', 'max:100'],
-            'no_whatsapp' => ['nullable', 'string', 'max:20', 'regex:/^[0-9+\-\s()]{6,20}$/'],
             'items' => ['required', 'array', 'min:1', 'max:50'],
->>>>>>> Stashed changes
+
             'items.*.id_produk' => ['required', 'integer', 'exists:produk,id_produk'],
-            'items.*.jumlah' => ['required', 'integer', 'min:1'],
-            'items.*.harga_satuan' => ['required', 'numeric', 'min:0'],
+            'items.*.jumlah' => ['required', 'integer', 'min:1', 'max:99'],
+            'items.*.harga_satuan' => ['nullable', 'numeric', 'min:0'],
             'items.*.topping' => ['nullable', 'string', 'max:255'],
             'items.*.gula' => ['nullable', 'string', 'max:255'],
             'items.*.es' => ['nullable', 'string', 'max:255'],
-            'items.*.catatan' => ['nullable', 'string'],
+            'items.*.catatan' => ['nullable', 'string', 'max:500'],
         ];
     }
 }
