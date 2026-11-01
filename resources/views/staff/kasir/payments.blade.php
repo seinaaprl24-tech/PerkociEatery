@@ -298,7 +298,8 @@
                     return;
                 }
 
-                receiptMeta.textContent = order.nomor_antrean + ' · ' + Kasir.tableLabel(order) + ' · '
+                receiptMeta.textContent = order.nomor_antrean + ' · ' + Kasir.tableLabel(order)
+                    + (Kasir.customer(order) ? ' · ' + Kasir.customer(order) : '') + ' · '
                     + new Date(order.tanggal_pesan).toLocaleString('id-ID');
 
                 Kasir.lines(order).forEach(function (line) {
@@ -348,7 +349,8 @@
 
                     var left = Kasir.make('div', 'min-w-0');
                     left.appendChild(Kasir.make('p', 'text-xs font-bold text-cocoa',
-                        order.nomor_antrean + ' · ' + Kasir.tableLabel(order)));
+                        order.nomor_antrean + ' · ' + Kasir.tableLabel(order)
+                        + (Kasir.customer(order) ? ' · ' + Kasir.customer(order) : '')));
                     left.appendChild(Kasir.make('p', 'mt-0.5 text-[11px] text-cocoa/45',
                         Kasir.itemCount(order) + ' item · ' + Kasir.ago(order.tanggal_pesan)));
                     pick.appendChild(left);
@@ -543,3 +545,4 @@
         });
     </script>
 @endpush
+

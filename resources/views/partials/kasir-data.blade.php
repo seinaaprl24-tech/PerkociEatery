@@ -86,6 +86,10 @@
             return order.meja && order.meja.no_meja ? 'Meja ' + order.meja.no_meja : 'Meja -';
         }
 
+        function customer(order) {
+            return order.nama_pemesan ? String(order.nama_pemesan) : '';
+        }
+
         function ago(iso) {
             var minutes = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
 
@@ -194,6 +198,7 @@
             itemCount: itemCount,
             menuSummary: menuSummary,
             tableLabel: tableLabel,
+            customer: customer,
             ago: ago,
             isToday: isToday,
             loadOrders: loadOrders,

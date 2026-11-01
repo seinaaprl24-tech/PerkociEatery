@@ -375,6 +375,9 @@
                 }
             });
 
+            document.querySelector('[data-submit]').addEventListener('click', function () {
+                this.textContent = 'Pesanan Terkirim ke Dapur ✓';
+                this.classList.add('bg-brand-dark');
             function setBusy(state) {
                 busy = state;
                 submitBtn.disabled = state || !tableId;
@@ -451,6 +454,7 @@
                                 id: order.id_pesanan,
                                 nomor: order.nomor_antrean,
                                 total: order.total_harga,
+                                kode: order.kode_akses,
                                 at: Date.now()
                             }));
                         } catch (e) {
@@ -472,6 +476,7 @@
                         setBusy(false);
                         render();
                     });
+
             });
 
             render();

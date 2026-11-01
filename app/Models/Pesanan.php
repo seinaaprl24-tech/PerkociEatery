@@ -20,6 +20,9 @@ class Pesanan extends Model
     protected $fillable = [
         'id_meja',
         'nomor_antrean',
+        'nama_pemesan',
+        'no_whatsapp',
+        'kode_akses',
         'tanggal_pesan',
         'total_harga',
         'status_pesanan',
@@ -44,4 +47,3 @@ class Pesanan extends Model
         return $this->hasOne(Pembayaran::class, 'id_pesanan', 'id_pesanan');
     }
 }
-

@@ -27,7 +27,9 @@ class StorePesananRequest extends FormRequest
     {
         return [
             'id_meja' => ['required', 'integer', 'exists:meja,id_meja'],
+            'items' => ['required', 'array', 'min:1'],
             'items' => ['required', 'array', 'min:1', 'max:50'],
+
             'items.*.id_produk' => ['required', 'integer', 'exists:produk,id_produk'],
             'items.*.jumlah' => ['required', 'integer', 'min:1', 'max:99'],
             'items.*.harga_satuan' => ['nullable', 'numeric', 'min:0'],

@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -42,9 +43,11 @@ class PesananController extends Controller
         return PesananResource::collection($query->paginate($perPage)->withQueryString());
     }
 
-    public function show(Pesanan $pesanan): PesananResource
+    public function show(Request $request, Pesanan $pesanan): PesananResource
     {
-        return new PesananResource($pesanan->load(['meja', 'detailPesanan.produk']));
+        $this->authorizeAccess($request, $pesanan);
+
+        return new PesananResource($pesanan->load(['meja', 'detailPesanan.produk', 'pembayaran']));
     }
 
     public function store(StorePesananRequest $request): JsonResponse
@@ -76,6 +79,9 @@ class PesananController extends Controller
             $pesanan = Pesanan::create([
                 'id_meja' => $validated['id_meja'],
                 'nomor_antrean' => $this->generateNomorAntrean(),
+                'nama_pemesan' => $validated['nama_pemesan'] ?? null,
+                'no_whatsapp' => $validated['no_whatsapp'] ?? null,
+                'kode_akses' => Str::random(12),
                 'tanggal_pesan' => Carbon::now(),
                 'total_harga' => 0,
                 'status_pesanan' => 'menunggu',
@@ -139,6 +145,14 @@ class PesananController extends Controller
 
         // Pesanan yang sudah batal tidak boleh diubah lagi
         // (mencegah stok dikembalikan dua kali).
+        // Pesanan yang sudah dibayar tidak boleh dibatalkan/diubah, supaya laporan
+        // pemasukan tidak menyimpang dari status pesanan.
+        if ($statusLama === 'selesai' && $statusBaru !== 'selesai') {
+            throw ValidationException::withMessages([
+                'status_pesanan' => ['Pesanan yang sudah dibayar tidak dapat diubah atau dibatalkan. Batalkan pembayarannya terlebih dahulu.'],
+            ]);
+        }
+
         if ($statusLama === 'batal' && $statusBaru !== 'batal') {
             throw ValidationException::withMessages([
                 'status_pesanan' => ['Pesanan yang sudah dibatalkan tidak dapat diubah.'],
@@ -158,6 +172,12 @@ class PesananController extends Controller
 
     public function destroy(Pesanan $pesanan): JsonResponse
     {
+        if ($pesanan->status_pesanan === 'selesai') {
+            return response()->json([
+                'message' => 'Pesanan yang sudah dibayar tidak dapat dibatalkan atau dihapus.',
+            ], 409);
+        }
+
         DB::transaction(function () use ($pesanan) {
             if ($pesanan->status_pesanan !== 'batal') {
                 $this->kembalikanStok($pesanan);
@@ -178,10 +198,12 @@ class PesananController extends Controller
         ]);
     }
 
-    public function cetakStruk($id): JsonResponse
+    public function cetakStruk(Request $request, $id): JsonResponse
     {
         $pesanan = Pesanan::with(['meja', 'detailPesanan.produk', 'pembayaran'])
             ->findOrFail($id);
+
+        $this->authorizeAccess($request, $pesanan);
 
         $resource = (new PesananResource($pesanan))->resolve();
 
@@ -201,6 +223,7 @@ class PesananController extends Controller
                     'telepon' => '-',
                 ],
                 'nomor_antrean' => $resource['nomor_antrean'] ?? $pesanan->nomor_antrean,
+                'nama_pemesan' => $pesanan->nama_pemesan,
                 'nama_meja' => $resource['meja']['no_meja'] ?? null,
                 'meja' => $resource['meja'] ?? null,
                 'daftar_item' => $items,
@@ -213,6 +236,27 @@ class PesananController extends Controller
                 'pembayaran' => $resource['pembayaran'] ?? null,
             ],
         ]);
+    }
+
+    /**
+     * Pesanan hanya boleh dibuka oleh staff yang login, atau oleh pemesan yang
+     * membawa kode_akses yang benar (?kode=...). Selain itu dijawab 404 supaya
+     * keberadaan pesanan tidak bisa ditebak dari ID.
+     */
+    private function authorizeAccess(Request $request, Pesanan $pesanan): void
+    {
+        $user = $request->user('sanctum');
+
+        if ($user && in_array($user->role, ['admin', 'kasir', 'manager'], true)) {
+            return;
+        }
+
+        $kode = $request->query('kode');
+
+        if (! is_string($kode) || $kode === '' || ! is_string($pesanan->kode_akses)
+            || ! hash_equals($pesanan->kode_akses, $kode)) {
+            abort(404);
+        }
     }
 
     /**
@@ -231,11 +275,21 @@ class PesananController extends Controller
         }
     }
 
+    /**
+     * Nomor antrean harian: ORD-YYYYMMDD-001, 002, ...
+     * Memakai nomor TERBESAR hari ini (bukan jumlah baris), jadi tetap aman
+     * walaupun ada pesanan yang pernah dihapus.
+     */
     private function generateNomorAntrean(): string
     {
-        $date = Carbon::now()->format('Ymd');
-        $count = Pesanan::whereDate('tanggal_pesan', Carbon::now()->toDateString())->count() + 1;
+        $prefix = 'ORD-'.Carbon::now()->format('Ymd').'-';
 
-        return 'ORD-' . $date . '-' . str_pad((string) $count, 3, '0', STR_PAD_LEFT);
+        $terakhir = Pesanan::where('nomor_antrean', 'like', $prefix.'%')
+            ->orderByRaw("CAST(SUBSTRING_INDEX(nomor_antrean, '-', -1) AS UNSIGNED) DESC")
+            ->value('nomor_antrean');
+
+        $berikutnya = $terakhir ? ((int) Str::afterLast($terakhir, '-')) + 1 : 1;
+
+        return $prefix.str_pad((string) $berikutnya, 3, '0', STR_PAD_LEFT);
     }
 }

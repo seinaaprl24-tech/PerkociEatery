@@ -62,8 +62,33 @@
 
         <div data-orders-empty class="hidden">
             <x-ui.empty-state icon="receipt_long" title="Tidak ada pesanan"
+                description="Tidak ada pesanan contoh dengan status ini." />
+        @else
+            <x-ui.table class="rounded-none border-0"
+                :head="['Pesanan', 'Meja', 'Pelanggan', 'Menu', 'Item', 'Total', 'Status', 'Aksi']">
+                @foreach ($rows as $row)
+                    <tr>
+                        <td class="font-semibold text-cocoa">{{ $row['id'] }}</td>
+                        <td class="whitespace-nowrap">{{ $row['table'] }}</td>
+                        <td class="whitespace-nowrap">{{ $row['customer'] }}</td>
+                        <td class="min-w-[220px] text-cocoa/70">{{ $row['menu'] }}</td>
+                        <td class="whitespace-nowrap">{{ $row['items'] }} item</td>
+                        <td class="whitespace-nowrap font-semibold text-cocoa">{{ \App\Support\Perkoci::rupiah($row['total']) }}</td>
+                        <td><x-ui.badge :tone="$row['status']['tone']">{{ $row['status']['label'] }}</x-ui.badge></td>
+                        <td>
+                            <button type="button" class="btn-secondary btn-sm"
+                                data-toast-message="Detail pesanan belum terhubung pada mode preview.">
+                                Detail
+                            </button>
+                        </td>
+                    </tr>
+                @endforeach
+            </x-ui.table>
+        @endif
+    </x-ui.section>
                 description="Belum ada pesanan dengan status ini." />
         </div>
+
 
         <x-ui.table data-orders-table class="rounded-none border-0"
             :head="['Pesanan', 'Meja', 'Menu', 'Item', 'Waktu', 'Total', 'Status', 'Aksi']">
@@ -122,6 +147,7 @@
 
                 tr.appendChild(cell('font-semibold text-cocoa', order.nomor_antrean));
                 tr.appendChild(cell('whitespace-nowrap', Kasir.tableLabel(order)));
+                tr.appendChild(cell('whitespace-nowrap', Kasir.customer(order) || '—'));
                 tr.appendChild(cell('min-w-[220px] text-cocoa/70', Kasir.menuSummary(order)));
                 tr.appendChild(cell('whitespace-nowrap', Kasir.itemCount(order) + ' item'));
                 tr.appendChild(cell('whitespace-nowrap', Kasir.ago(order.tanggal_pesan)));
@@ -210,4 +236,4 @@
             Kasir.every(refresh, 20000);
         });
     </script>
-@endpush
+    @endpush
