@@ -20,6 +20,7 @@ return [
         'name' => 'Perkoci Eatery',
         'tagline' => 'Artisanal Coffee & Kitchen',
         'footer' => 'Perkoci Preserving Culinary Warmth',
+        'address' => 'Sukasari RT.002/RW.018, Ciwidey, Kabupaten Bandung, Jawa Barat 40973.',
         // Salinan PNG dari logo asli (public/images/logo-perkoci.png.jpeg)
         // dengan area transparan dipangkas. Logo asli tidak diubah.
         'logo' => 'images/logo-perkoci-trim.png',

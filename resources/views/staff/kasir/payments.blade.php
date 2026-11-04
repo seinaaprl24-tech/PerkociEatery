@@ -1,6 +1,26 @@
 {{-- Kasir – Pembayaran & Cetak Struk: data nyata dari /api/pesanan dan /api/pembayaran. --}}
 @extends('layouts.staff')
 
+@php
+    /* ==== Ukuran struk (ubah di sini bila perlu) ==== */
+    $STRUK_LEBAR_MM = 58;
+    $STRUK_TINGGI_MIN_MM = 80;
+    $STRUK_PADDING_MM = 3;
+
+    /* Identitas kedai: alamat/telepon hanya ditampilkan jika tersedia di config. */
+    $perkociBrand = (array) config('perkoci.brand', []);
+    $brandAddress = $perkociBrand['address'] ?? $perkociBrand['alamat']
+        ?? config('perkoci.address') ?? config('perkoci.alamat');
+    $brandPhone = $perkociBrand['phone'] ?? $perkociBrand['telepon'] ?? $perkociBrand['telp']
+        ?? config('perkoci.phone') ?? config('perkoci.telepon') ?? config('perkoci.telp');
+
+    $brandAddress = is_string($brandAddress) ? trim($brandAddress) : $brandAddress;
+    $brandPhone = is_string($brandPhone) ? trim($brandPhone) : $brandPhone;
+
+    $brandAddress = ($brandAddress === '' || $brandAddress === '-') ? null : $brandAddress;
+    $brandPhone = ($brandPhone === '' || $brandPhone === '-') ? null : $brandPhone;
+@endphp
+
 @section('title', $role['payment_page']['title'].' — Perkoci Eatery')
 
 @section('staff_role', 'kasir')
@@ -14,12 +34,45 @@
 @endsection
 
 @push('head')
-    {{-- Saat mencetak, hanya struk yang tampil. --}}
+    {{-- Saat mencetak, hanya struk yang tampil. Ukuran kertas diatur lewat JS sebelum window.print(). --}}
     <style>
         @@media print {
+            html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+                background: #fff !important;
+            }
+
             body * { visibility: hidden; }
+
             [data-receipt], [data-receipt] * { visibility: visible; }
-            [data-receipt] { position: absolute; left: 0; top: 0; width: 100%; border: 0; }
+
+            [data-receipt] {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: {{ $STRUK_LEBAR_MM }}mm !important;
+                max-width: {{ $STRUK_LEBAR_MM }}mm !important;
+                min-height: 0 !important;
+                margin: 0 !important;
+                padding: {{ $STRUK_PADDING_MM }}mm !important;
+                border: 0 !important;
+                border-radius: 0 !important;
+                background: #fff !important;
+                box-shadow: none !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            [data-receipt] * {
+                color: #000 !important;
+                border-color: #555 !important;
+            }
+
+            /* Struk dipindah ke <body> saat cetak agar sisa halaman tidak ikut menjadi halaman kosong. */
+            html.receipt-printing body > *:not([data-receipt]) {
+                display: none !important;
+            }
         }
     </style>
 @endpush
@@ -29,9 +82,9 @@
         $page = $role['payment_page'];
 
         $methods = [
-            ['value' => 'tunai', 'label' => 'Tunai', 'meta' => 'Uang tunai di kasir'],
-            ['value' => 'qris', 'label' => 'QRIS', 'meta' => 'Scan kode QRIS'],
-            ['value' => 'e-wallet', 'label' => 'E-Wallet', 'meta' => 'Transfer / dompet digital'],
+            ['value' => 'tunai', 'label' => 'Tunai', 'meta' => 'Uang tunai di kasir', 'icon' => 'payments'],
+            ['value' => 'qris', 'label' => 'QRIS', 'meta' => 'Scan kode QRIS', 'icon' => 'qr_code_2'],
+            ['value' => 'e-wallet', 'label' => 'E-Wallet', 'meta' => 'Transfer / dompet digital', 'icon' => 'account_balance_wallet'],
         ];
     @endphp
 
@@ -39,132 +92,233 @@
 
     <p data-flash class="hidden" role="status"></p>
 
-    <div class="mt-5 grid gap-3 sm:grid-cols-3">
-        <x-ui.stat-card data-stat="total" label="Total Tagihan" value="Rp 0" icon="receipt_long" tone="brand"
-            hint="dari pesanan terpilih" />
-        <x-ui.stat-card data-stat="cash" label="Uang Diterima" value="Rp 0" icon="payments" tone="lime"
-            hint="nominal yang diisi kasir" />
-        <x-ui.stat-card data-stat="change" label="Kembalian" value="Rp 0" icon="price_check" tone="butter"
-            hint="diterima - total" />
-    </div>
+    <div class="mt-5 grid gap-4 xl:grid-cols-[1.35fr_1fr] xl:items-start">
+        {{-- ================= KIRI: Pembayaran ================= --}}
+        <section class="rounded-2xl border border-cocoa/10 bg-white p-5 sm:p-7" aria-label="Pembayaran">
+            <div data-summary-empty>
+                <x-ui.empty-state icon="payments" title="Belum ada pesanan dipilih"
+                    description="Pilih pesanan dari antrean pembayaran." />
+            </div>
 
-    <div class="mt-4 grid gap-4 xl:grid-cols-2">
-        {{-- Struk --}}
-        <x-ui.section title="Pratinjau Struk" description="Isi struk mengikuti pesanan yang dipilih.">
-            <div data-receipt class="rounded-xl border border-dashed border-cocoa/25 bg-white px-4 py-4 text-[11px]">
-                <div class="text-center">
-                    <p class="font-display text-[14px] font-bold text-cocoa">{{ config('perkoci.brand.name') }}</p>
-                    <p class="mt-1 text-[10px] leading-relaxed text-cocoa/45" data-receipt-meta>Belum ada pesanan dipilih</p>
+            <div class="hidden space-y-5" data-summary>
+                {{-- 1. Nomor pesanan + lencana status --}}
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <h2 class="min-w-0 break-words font-display text-[28px] font-bold leading-tight text-cocoa" data-sum-number>-</h2>
+                    <span class="badge badge-butter shrink-0 whitespace-nowrap" data-sum-status>Menunggu Pembayaran</span>
                 </div>
 
-                <div class="my-3 border-t border-dashed border-cocoa/20"></div>
-
-                <ul class="space-y-1.5" data-receipt-items></ul>
-
-                <div class="my-3 border-t border-dashed border-cocoa/20"></div>
-
-                <dl class="space-y-1.5">
-                    <div class="flex items-center justify-between">
-                        <dt class="text-cocoa/55">Total</dt>
-                        <dd class="font-display text-[14px] font-bold text-cocoa" data-receipt-total>Rp 0</dd>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <dt class="text-cocoa/55" data-receipt-method>Tunai</dt>
-                        <dd class="font-semibold text-cocoa" data-receipt-cash>Rp 0</dd>
-                    </div>
-                    <div class="flex items-center justify-between border-t border-dashed border-cocoa/20 pt-1.5">
-                        <dt class="font-bold text-cocoa">Kembalian</dt>
-                        <dd class="font-display text-[14px] font-bold text-brand" data-receipt-change>Rp 0</dd>
-                    </div>
-                </dl>
-
-                <p class="mt-3 text-center text-[9.5px] leading-relaxed text-cocoa/35" data-receipt-note>
-                    Pilih pesanan di antrean untuk mulai pembayaran.
+                {{-- 2. Meja • nama pemesan --}}
+                <p class="-mt-2 text-[14px] text-cocoa/60">
+                    <span data-sum-table>-</span><span data-sum-customer></span>
                 </p>
+
+                {{-- 3. Daftar item --}}
+                <div class="rounded-2xl border border-cocoa/10 bg-sand/40 px-4 py-2 sm:px-5">
+                    <ul class="divide-y divide-cocoa/10" data-sum-lines></ul>
+
+                    <div class="flex items-center justify-between gap-4 border-t border-cocoa/15 py-3">
+                        <p class="text-[13px] font-semibold text-cocoa/60">
+                            Subtotal · <span data-sum-items>-</span>
+                        </p>
+                        <p class="text-[15px] font-bold text-cocoa" data-sum-subtotal>Rp 0</p>
+                    </div>
+                </div>
+
+                {{-- 4. Kotak TOTAL --}}
+                <div data-stat="total" class="rounded-2xl bg-cocoa px-6 py-6 text-center text-white">
+                    <p class="text-[11px] font-bold uppercase tracking-[0.2em] text-white/60">Total</p>
+                    <p class="mt-1.5 font-display text-[40px] font-bold leading-none">Rp 0</p>
+                </div>
+            </div>
+
+            <form data-pay-form id="pay-form" class="mt-6 hidden space-y-5" novalidate>
+                {{-- 5. Metode pembayaran --}}
+                <div data-pay-controls>
+                    <p class="text-[11px] font-bold uppercase tracking-[0.16em] text-cocoa/50">Metode Pembayaran</p>
+
+                    <div class="mt-2.5 grid grid-cols-3 gap-2.5 sm:gap-3">
+                        @foreach ($methods as $method)
+                            <label class="flex cursor-pointer flex-col items-center gap-1 rounded-2xl border-2 border-cocoa/10 bg-white px-2 py-4 text-center transition hover:bg-sand/60 has-[:checked]:border-brand has-[:checked]:bg-brand/10 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand/40 sm:px-3">
+                                <input type="radio" name="metode" value="{{ $method['value'] }}"
+                                    @checked($loop->first) class="sr-only">
+
+                                <span class="ms text-[30px] leading-none text-cocoa" aria-hidden="true">{{ $method['icon'] }}</span>
+                                <span class="text-[14px] font-bold text-cocoa">{{ $method['label'] }}</span>
+                                <span class="text-[10.5px] leading-snug text-cocoa/50">{{ $method['meta'] }}</span>
+                            </label>
+                        @endforeach
+                    </div>
+                </div>
+
+                {{-- 6. Total / Uang Diterima / Kembalian --}}
+                <div class="grid gap-3 sm:grid-cols-3">
+                    <div class="rounded-2xl bg-sand px-4 py-3.5">
+                        <p class="text-[11px] font-bold uppercase tracking-[0.14em] text-cocoa/50">Total</p>
+                        <p class="mt-1.5 font-display text-[22px] font-bold leading-tight text-cocoa" data-total-mirror>Rp 0</p>
+                    </div>
+
+                    <div data-stat="cash" class="rounded-2xl bg-sand px-4 py-3.5">
+                        <label for="pay-cash" class="block text-[11px] font-bold uppercase tracking-[0.14em] text-cocoa/50">Uang Diterima</label>
+                        {{-- Target pengisian script (.font-display); nilai yang tampil ada di input di bawahnya. --}}
+                        <span class="font-display sr-only" aria-hidden="true">Rp 0</span>
+                        <input id="pay-cash" data-pay-cash type="number" min="0" step="500" inputmode="numeric"
+                            placeholder="0"
+                            class="mt-1.5 w-full rounded-xl border border-cocoa/15 bg-white px-3 py-2 text-[22px] font-bold leading-tight text-cocoa outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/30 read-only:bg-white/60 read-only:text-cocoa/70">
+                    </div>
+
+                    <div data-stat="change" class="rounded-2xl bg-brand px-4 py-3.5 text-white">
+                        <p class="text-[11px] font-bold uppercase tracking-[0.14em] text-white/75">Kembalian</p>
+                        <p class="mt-1.5 font-display text-[22px] font-bold leading-tight">Rp 0</p>
+                    </div>
+                </div>
+
+                {{-- 7 & 8. Nominal cepat + konfirmasi --}}
+                <div class="space-y-4" data-pay-controls>
+                    <div class="flex flex-wrap gap-2" data-quick-cash></div>
+
+                    <button type="submit" class="btn-primary w-full justify-center py-4 text-[15px]" data-pay-submit>
+                        Konfirmasi Pembayaran
+                    </button>
+                </div>
+            </form>
+
+            <div class="mt-4 hidden" data-after-pay>
+                <button type="button" class="btn-secondary w-full justify-center py-4 text-[15px]" data-next>
+                    Pesanan Berikutnya
+                </button>
+            </div>
+        </section>
+
+        {{-- ================= KANAN: Pratinjau Struk ================= --}}
+        <x-ui.section title="Pratinjau Struk" description="Isi struk mengikuti pesanan yang dipilih.">
+            <div class="flex justify-center overflow-x-auto py-1" data-receipt-holder>
+                <div data-receipt
+                    data-receipt-width-mm="{{ $STRUK_LEBAR_MM }}"
+                    data-receipt-min-height-mm="{{ $STRUK_TINGGI_MIN_MM }}"
+                    class="rounded-xl border border-dashed border-cocoa/25 bg-white text-cocoa"
+                    style="width: {{ $STRUK_LEBAR_MM }}mm; box-sizing: border-box; margin: 0 auto; padding: {{ $STRUK_PADDING_MM }}mm; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace; font-size: 10px; line-height: 1.45;">
+
+                    {{-- Kepala struk --}}
+                    <div class="text-center">
+                        <p class="text-[12px] font-bold uppercase tracking-wide">{{ config('perkoci.brand.name') }}</p>
+
+                        @if ($brandAddress)
+                            <p class="mt-0.5 text-[9px] leading-snug">{{ $brandAddress }}</p>
+                        @endif
+
+                        @if ($brandPhone)
+                            <p class="mt-0.5 text-[9px] leading-snug">Telp. {{ $brandPhone }}</p>
+                        @endif
+                    </div>
+
+                    <div class="my-2 border-t border-dashed border-cocoa/30"></div>
+
+                    <p class="text-center text-[9.5px] leading-snug text-cocoa/55" data-receipt-empty>
+                        Belum ada pesanan dipilih.
+                    </p>
+
+                    <div class="hidden" data-receipt-body>
+                        {{-- Info pesanan --}}
+                        <dl class="space-y-0.5">
+                            <div class="flex items-start justify-between gap-2">
+                                <dt class="shrink-0 text-cocoa/60">Antrean</dt>
+                                <dd class="min-w-0 break-words text-right font-semibold" data-receipt-order>-</dd>
+                            </div>
+                            <div class="flex items-start justify-between gap-2">
+                                <dt class="shrink-0 text-cocoa/60">Tanggal</dt>
+                                <dd class="min-w-0 text-right" data-receipt-datetime>-</dd>
+                            </div>
+                            <div class="flex items-start justify-between gap-2">
+                                <dt class="shrink-0 text-cocoa/60">Meja</dt>
+                                <dd class="min-w-0 text-right" data-receipt-table>-</dd>
+                            </div>
+                            <div class="hidden items-start justify-between gap-2" data-receipt-customer-row>
+                                <dt class="shrink-0 text-cocoa/60">Pemesan</dt>
+                                <dd class="min-w-0 break-words text-right" data-receipt-customer>-</dd>
+                            </div>
+                            <div class="flex items-start justify-between gap-2">
+                                <dt class="shrink-0 text-cocoa/60">Kasir</dt>
+                                <dd class="min-w-0 break-words text-right">{{ auth()->user()?->nama ?? '-' }}</dd>
+                            </div>
+                        </dl>
+
+                        <div class="my-2 border-t border-dashed border-cocoa/30"></div>
+
+                        {{-- Daftar item --}}
+                        <ul class="space-y-1.5" data-receipt-items></ul>
+
+                        <div class="my-2 border-t border-dashed border-cocoa/30"></div>
+
+                        {{-- Subtotal & total --}}
+                        <dl class="space-y-1">
+                            <div class="flex items-center justify-between gap-2">
+                                <dt class="text-cocoa/60">SUBTOTAL</dt>
+                                <dd class="font-semibold" data-receipt-subtotal>Rp 0</dd>
+                            </div>
+                            <div class="flex items-center justify-between gap-2">
+                                <dt class="text-[11px] font-bold">TOTAL</dt>
+                                <dd class="text-[12px] font-bold" data-receipt-total>Rp 0</dd>
+                            </div>
+                        </dl>
+
+                        <div class="my-2 border-t border-dashed border-cocoa/30"></div>
+
+                        {{-- Pembayaran --}}
+                        <dl class="space-y-1">
+                            <div class="flex items-center justify-between gap-2">
+                                <dt class="text-cocoa/60">PEMBAYARAN</dt>
+                                <dd class="font-semibold" data-receipt-method>Tunai</dd>
+                            </div>
+                            <div class="flex items-center justify-between gap-2">
+                                <dt class="text-cocoa/60" data-receipt-received-label>Uang diterima</dt>
+                                <dd class="font-semibold" data-receipt-cash>Rp 0</dd>
+                            </div>
+                            <div class="flex items-center justify-between gap-2">
+                                <dt class="text-cocoa/60">Kembalian</dt>
+                                <dd class="font-semibold" data-receipt-change>Rp 0</dd>
+                            </div>
+                        </dl>
+
+                        <div class="my-2 border-t border-dashed border-cocoa/30"></div>
+
+                        {{-- Penutup --}}
+                        <div class="text-center">
+                            <p class="text-[11px] font-bold uppercase tracking-wide" data-receipt-status>Pratinjau (belum dibayar)</p>
+                            <p class="mt-0.5 text-[9.5px] text-cocoa/60">Terima kasih</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button type="button" data-print disabled
+                class="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-cocoa px-4 py-3.5 text-[14px] font-semibold text-white transition hover:bg-cocoa/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-cocoa">
+                <span class="ms text-[18px] leading-none" aria-hidden="true">print</span>
+                Cetak Struk
+            </button>
+        </x-ui.section>
+    </div>
+
+    {{-- ================= BAWAH: Antrean & Riwayat ================= --}}
+    <div class="mt-4 grid gap-4 lg:grid-cols-2 lg:items-start">
+        {{-- Antrean pembayaran --}}
+        <x-ui.section title="Antrean Pembayaran" description="Pesanan aktif yang belum dibayar.">
+            <ul class="space-y-2.5" data-queue></ul>
+
+            <div data-queue-empty class="hidden">
+                <x-ui.empty-state icon="receipt_long" title="Tidak ada antrean pembayaran"
+                    description="Semua pesanan aktif sudah dibayar." />
             </div>
         </x-ui.section>
 
-        <div class="space-y-4">
-            {{-- Pembayaran --}}
-            <x-ui.section title="Pembayaran" description="Konfirmasi pembayaran untuk pesanan yang dipilih.">
-                <div data-summary-empty>
-                    <x-ui.empty-state icon="payments" title="Belum ada pesanan dipilih"
-                        description="Pilih pesanan dari antrean pembayaran." />
-                </div>
+        {{-- Riwayat --}}
+        <x-ui.section title="Riwayat Pembayaran" description="10 pembayaran terakhir.">
+            <ul class="space-y-2.5" data-history></ul>
 
-                <dl class="hidden space-y-2.5" data-summary>
-                    <div class="flex items-center justify-between gap-3">
-                        <dt class="text-xs text-cocoa/50">Nomor pesanan</dt>
-                        <dd class="text-xs font-bold text-cocoa" data-sum-number>-</dd>
-                    </div>
-                    <div class="flex items-center justify-between gap-3">
-                        <dt class="text-xs text-cocoa/50">Meja</dt>
-                        <dd class="text-xs font-semibold text-cocoa" data-sum-table>-</dd>
-                    </div>
-                    <div class="flex items-center justify-between gap-3">
-                        <dt class="text-xs text-cocoa/50">Jumlah item</dt>
-                        <dd class="text-xs font-semibold text-cocoa" data-sum-items>-</dd>
-                    </div>
-                </dl>
-
-                <form data-pay-form class="mt-4 hidden space-y-3" novalidate>
-                    <div>
-                        <p class="field-label">Metode Pembayaran</p>
-
-                        <div class="grid gap-2 sm:grid-cols-3">
-                            @foreach ($methods as $method)
-                                <label class="flex cursor-pointer items-start gap-2.5 rounded-xl border border-cocoa/10 bg-sand/70 px-3 py-2.5 transition has-[:checked]:border-brand/45 has-[:checked]:bg-brand/[0.06]">
-                                    <input type="radio" name="metode" value="{{ $method['value'] }}"
-                                        @checked($loop->first) class="mt-0.5 h-[16px] w-[16px] shrink-0 accent-brand">
-
-                                    <span class="min-w-0">
-                                        <span class="block text-[12.5px] font-semibold text-cocoa">{{ $method['label'] }}</span>
-                                        <span class="mt-0.5 block text-[10.5px] text-cocoa/50">{{ $method['meta'] }}</span>
-                                    </span>
-                                </label>
-                            @endforeach
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="field-label" for="pay-cash">Uang Diterima</label>
-                        <input id="pay-cash" data-pay-cash type="number" min="0" step="500" inputmode="numeric"
-                            class="field" placeholder="Masukkan nominal">
-                        <div class="mt-2 flex flex-wrap gap-1.5" data-quick-cash></div>
-                    </div>
-
-                    <button type="submit" class="btn-primary" data-pay-submit>Konfirmasi Pembayaran</button>
-                </form>
-
-                <div class="mt-4 hidden flex-wrap gap-2" data-after-pay>
-                    <button type="button" class="btn-secondary" data-print>
-                        <span class="ms text-[16px] leading-none" aria-hidden="true">print</span>
-                        Cetak Struk
-                    </button>
-                    <button type="button" class="btn-ghost" data-next>Pesanan Berikutnya</button>
-                </div>
-            </x-ui.section>
-
-            {{-- Antrean pembayaran --}}
-            <x-ui.section title="Antrean Pembayaran" description="Pesanan aktif yang belum dibayar.">
-                <ul class="space-y-2.5" data-queue></ul>
-
-                <div data-queue-empty class="hidden">
-                    <x-ui.empty-state icon="receipt_long" title="Tidak ada antrean pembayaran"
-                        description="Semua pesanan aktif sudah dibayar." />
-                </div>
-            </x-ui.section>
-
-            {{-- Riwayat --}}
-            <x-ui.section title="Riwayat Pembayaran" description="10 pembayaran terakhir.">
-                <ul class="space-y-2.5" data-history></ul>
-
-                <div data-history-empty class="hidden">
-                    <x-ui.empty-state icon="history" title="Belum ada pembayaran"
-                        description="Pembayaran yang sudah diterima akan tampil di sini." />
-                </div>
-            </x-ui.section>
-        </div>
+            <div data-history-empty class="hidden">
+                <x-ui.empty-state icon="history" title="Belum ada pembayaran"
+                    description="Pembayaran yang sudah diterima akan tampil di sini." />
+            </div>
+        </x-ui.section>
     </div>
 @endsection
 
@@ -181,23 +335,45 @@
 
             var flashEl = q('[data-flash]');
             var form = q('[data-pay-form]');
+            var payControls = document.querySelectorAll('[data-pay-controls]');
             var cashInput = q('[data-pay-cash]');
             var quickEl = q('[data-quick-cash]');
             var submitBtn = q('[data-pay-submit]');
             var afterPay = q('[data-after-pay]');
+            var printBtn = q('[data-print]');
             var queueEl = q('[data-queue]');
             var queueEmpty = q('[data-queue-empty]');
             var historyEl = q('[data-history]');
             var historyEmpty = q('[data-history-empty]');
             var summaryEl = q('[data-summary]');
             var summaryEmpty = q('[data-summary-empty]');
-            var receiptMeta = q('[data-receipt-meta]');
+            var sumStatus = q('[data-sum-status]');
+            var sumCustomer = q('[data-sum-customer]');
+            var sumLines = q('[data-sum-lines]');
+            var sumSubtotal = q('[data-sum-subtotal]');
+            var totalMirror = q('[data-total-mirror]');
+
+            var receiptEl = q('[data-receipt]');
+            var receiptEmpty = q('[data-receipt-empty]');
+            var receiptBody = q('[data-receipt-body]');
+            var receiptOrder = q('[data-receipt-order]');
+            var receiptDatetime = q('[data-receipt-datetime]');
+            var receiptTable = q('[data-receipt-table]');
+            var receiptCustomerRow = q('[data-receipt-customer-row]');
+            var receiptCustomer = q('[data-receipt-customer]');
             var receiptItems = q('[data-receipt-items]');
+            var receiptSubtotal = q('[data-receipt-subtotal]');
             var receiptTotal = q('[data-receipt-total]');
             var receiptMethod = q('[data-receipt-method]');
+            var receiptReceivedLabel = q('[data-receipt-received-label]');
             var receiptCash = q('[data-receipt-cash]');
             var receiptChange = q('[data-receipt-change]');
-            var receiptNote = q('[data-receipt-note]');
+            var receiptStatus = q('[data-receipt-status]');
+
+            var STRUK_LEBAR_MM = parseFloat(receiptEl.getAttribute('data-receipt-width-mm')) || 58;
+            var STRUK_TINGGI_MIN_MM = parseFloat(receiptEl.getAttribute('data-receipt-min-height-mm')) || 80;
+            var pageStyle = null;
+            var printHome = null;
 
             var orders = [];
             var history = [];
@@ -227,6 +403,13 @@
             }
 
             function syncMethod() {
+                /* Setelah dibayar, isian uang dikunci dan menampilkan nominal yang diterima. */
+                if (paid) {
+                    cashInput.readOnly = true;
+
+                    return;
+                }
+
                 if (method() === 'tunai') {
                     cashInput.readOnly = false;
                 } else {
@@ -265,73 +448,255 @@
                 options.slice(0, 4).forEach(function (value, index) {
                     quickEl.appendChild(Kasir.button(index === 0 ? 'Uang pas' : Kasir.rupiah(value), 'chip', function () {
                         cashInput.value = value;
+                        renderReceipt();
                         renderMoney();
                     }));
                 });
             }
 
-            function renderMoney() {
+            function lineSubtotal(line) {
+                var subtotal = Number(line.subtotal);
+
+                if (!isFinite(subtotal)) {
+                    subtotal = (parseInt(line.jumlah, 10) || 0) * (Number(line.harga_satuan) || 0);
+                }
+
+                return subtotal;
+            }
+
+            function subtotalOf(order) {
+                return Kasir.lines(order).reduce(function (sum, line) {
+                    return sum + lineSubtotal(line);
+                }, 0);
+            }
+
+            /* Nilai yang dipakai struk: tunai memakai uang diterima, non-tunai dianggap dibayar pas. */
+            function receiptState() {
                 var order = paid ? paid.order : selected;
                 var total = totalOf(order);
-                var received = paid ? paid.cash : cash();
-                var change = paid ? paid.change : Math.max(0, received - total);
+                var methodLabel = paid
+                    ? (paid.method || METHOD_LABEL[method()] || 'Tunai')
+                    : (METHOD_LABEL[method()] || 'Tunai');
+                var isCash = String(methodLabel).toLowerCase().indexOf('tunai') !== -1;
+                var received;
+                var change;
 
-                Kasir.setStat('total', Kasir.rupiah(total));
-                Kasir.setStat('cash', Kasir.rupiah(received));
-                Kasir.setStat('change', Kasir.rupiah(change));
+                if (paid) {
+                    received = Number(paid.cash) || 0;
+                    change = Number(paid.change) || 0;
+                } else if (isCash) {
+                    received = cash();
+                    change = Math.max(0, received - total);
+                } else {
+                    received = total;
+                    change = 0;
+                }
 
-                receiptTotal.textContent = Kasir.rupiah(total);
-                receiptCash.textContent = Kasir.rupiah(received);
-                receiptChange.textContent = Kasir.rupiah(change);
-                receiptMethod.textContent = paid ? (paid.method || 'Tunai') : (METHOD_LABEL[method()] || 'Tunai');
+                return {
+                    order: order,
+                    total: total,
+                    methodLabel: methodLabel,
+                    isCash: isCash,
+                    received: received,
+                    change: change
+                };
+            }
+
+            function formatDateTime(value) {
+                var date = new Date(value);
+
+                if (isNaN(date.getTime())) {
+                    return '-';
+                }
+
+                return date.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                    + ' ' + date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+            }
+
+            function renderMoney() {
+                var state = receiptState();
+
+                Kasir.setStat('total', Kasir.rupiah(state.total));
+                Kasir.setStat('cash', Kasir.rupiah(state.received));
+                Kasir.setStat('change', Kasir.rupiah(state.change));
+
+                if (totalMirror) {
+                    totalMirror.textContent = Kasir.rupiah(state.total);
+                }
+            }
+
+            function renderReceiptItems(order) {
+                Kasir.clear(receiptItems);
+
+                Kasir.lines(order).forEach(function (line) {
+                    var qty = parseInt(line.jumlah, 10) || 0;
+                    var unitPrice = Number(line.harga_satuan);
+
+                    if (!isFinite(unitPrice)) {
+                        unitPrice = qty > 0 ? (Number(line.subtotal) || 0) / qty : 0;
+                    }
+
+                    var item = Kasir.make('li', 'space-y-0.5');
+                    item.appendChild(Kasir.make(
+                        'p',
+                        'break-words font-semibold leading-snug',
+                        line.nama_produk || (line.produk && line.produk.nama_produk) || '-'
+                    ));
+
+                    var detail = Kasir.make('div', 'flex items-start justify-between gap-2');
+                    detail.appendChild(Kasir.make('span', 'shrink-0 text-cocoa/70', qty + ' x ' + Kasir.rupiah(unitPrice)));
+                    detail.appendChild(Kasir.make('span', 'shrink-0 font-semibold', Kasir.rupiah(line.subtotal)));
+                    item.appendChild(detail);
+
+                    receiptItems.appendChild(item);
+                });
             }
 
             function renderReceipt() {
-                var order = paid ? paid.order : selected;
+                var state = receiptState();
+                var order = state.order;
+                var customer = order ? Kasir.customer(order) : '';
 
-                Kasir.clear(receiptItems);
+                receiptEmpty.classList.toggle('hidden', !!order);
+                receiptBody.classList.toggle('hidden', !order);
 
                 if (!order) {
-                    receiptMeta.textContent = 'Belum ada pesanan dipilih';
-                    receiptNote.textContent = 'Pilih pesanan di antrean untuk mulai pembayaran.';
+                    Kasir.clear(receiptItems);
 
                     return;
                 }
 
-                receiptMeta.textContent = order.nomor_antrean + ' · ' + Kasir.tableLabel(order)
-                    + (Kasir.customer(order) ? ' · ' + Kasir.customer(order) : '') + ' · '
-                    + new Date(order.tanggal_pesan).toLocaleString('id-ID');
+                receiptOrder.textContent = order.nomor_antrean || '-';
+                receiptDatetime.textContent = formatDateTime(order.tanggal_pesan);
+                receiptTable.textContent = Kasir.tableLabel(order);
+
+                receiptCustomerRow.classList.toggle('hidden', !customer);
+                receiptCustomerRow.classList.toggle('flex', !!customer);
+                receiptCustomer.textContent = customer || '-';
+
+                renderReceiptItems(order);
+
+                receiptSubtotal.textContent = Kasir.rupiah(subtotalOf(order));
+                receiptTotal.textContent = Kasir.rupiah(state.total);
+                receiptMethod.textContent = state.methodLabel;
+                receiptReceivedLabel.textContent = state.isCash ? 'Uang diterima' : 'Dibayar';
+                receiptCash.textContent = Kasir.rupiah(state.received);
+                receiptChange.textContent = Kasir.rupiah(state.change);
+                receiptStatus.textContent = paid ? 'LUNAS' : 'Pratinjau (belum dibayar)';
+                receiptStatus.classList.toggle('text-brand', !!paid);
+            }
+
+            /* ==== Cetak: ukuran kertas mengikuti tinggi struk ==== */
+            function pxToMm(px) {
+                return px * 25.4 / 96;
+            }
+
+            function receiptHeightMm() {
+                var height = pxToMm(receiptEl.getBoundingClientRect().height) + 6;
+
+                return Math.max(STRUK_TINGGI_MIN_MM, Math.ceil(height));
+            }
+
+            function ensurePageStyle() {
+                if (!pageStyle) {
+                    pageStyle = document.createElement('style');
+                    pageStyle.setAttribute('data-receipt-page', '');
+                    document.head.appendChild(pageStyle);
+                }
+
+                return pageStyle;
+            }
+
+            function applyPageSize() {
+                /* @@page hanya dipakai saat mencetak, jadi aman ditulis lewat JS. */
+                ensurePageStyle().textContent = '@@page { size: '
+                    + STRUK_LEBAR_MM + 'mm ' + receiptHeightMm() + 'mm; margin: 0; }';
+            }
+
+            function mountReceipt() {
+                if (printHome || !receiptEl.parentNode) {
+                    return;
+                }
+
+                printHome = { parent: receiptEl.parentNode, next: receiptEl.nextSibling };
+                document.body.appendChild(receiptEl);
+                document.documentElement.classList.add('receipt-printing');
+            }
+
+            function unmountReceipt() {
+                if (!printHome) {
+                    return;
+                }
+
+                var home = printHome;
+                printHome = null;
+
+                document.documentElement.classList.remove('receipt-printing');
+
+                if (home.parent && home.parent.isConnected) {
+                    var before = home.next && home.next.parentNode === home.parent ? home.next : null;
+                    home.parent.insertBefore(receiptEl, before);
+                }
+            }
+
+            function preparePrint() {
+                renderReceipt();
+                mountReceipt();
+                applyPageSize();
+            }
+
+            window.addEventListener('beforeprint', preparePrint);
+            window.addEventListener('afterprint', unmountReceipt);
+
+            function renderSummaryLines(order) {
+                Kasir.clear(sumLines);
 
                 Kasir.lines(order).forEach(function (line) {
-                    var item = Kasir.make('li', 'flex items-start justify-between gap-2');
-                    var name = Kasir.make('span', 'min-w-0 text-cocoa/70');
-                    name.appendChild(Kasir.make('span', 'font-semibold text-cocoa', (line.jumlah || 0) + '× '));
-                    name.appendChild(document.createTextNode(line.nama_produk || (line.produk && line.produk.nama_produk) || '-'));
-                    item.appendChild(name);
-                    item.appendChild(Kasir.make('span', 'shrink-0 font-semibold text-cocoa', Kasir.rupiah(line.subtotal)));
-                    receiptItems.appendChild(item);
-                });
+                    var qty = parseInt(line.jumlah, 10) || 0;
+                    var name = line.nama_produk || (line.produk && line.produk.nama_produk) || '-';
+                    var item = Kasir.make('li', 'flex items-start justify-between gap-4 py-2.5');
 
-                receiptNote.textContent = paid
-                    ? 'LUNAS — terima kasih sudah memesan.'
-                    : 'Pratinjau struk (belum dibayar).';
+                    item.appendChild(Kasir.make('span', 'min-w-0 break-words text-[14px] font-semibold text-cocoa', qty + '× ' + name));
+                    item.appendChild(Kasir.make('span', 'shrink-0 text-[14px] font-semibold text-cocoa', Kasir.rupiah(lineSubtotal(line))));
+
+                    sumLines.appendChild(item);
+                });
             }
 
             function renderSummary() {
                 var order = paid ? paid.order : selected;
+                var showControls = !!selected && !paid;
 
                 summaryEmpty.classList.toggle('hidden', !!order);
                 summaryEl.classList.toggle('hidden', !order);
 
                 if (order) {
+                    var customer = Kasir.customer(order);
+
                     q('[data-sum-number]').textContent = order.nomor_antrean;
                     q('[data-sum-table]').textContent = Kasir.tableLabel(order);
+                    sumCustomer.textContent = customer ? ' • ' + customer : '';
                     q('[data-sum-items]').textContent = Kasir.itemCount(order) + ' item';
+                    sumSubtotal.textContent = Kasir.rupiah(subtotalOf(order));
+                    renderSummaryLines(order);
+
+                    sumStatus.textContent = paid ? 'Lunas' : 'Menunggu Pembayaran';
+                    sumStatus.className = paid
+                        ? 'badge badge-lime shrink-0 whitespace-nowrap'
+                        : 'badge badge-butter shrink-0 whitespace-nowrap';
                 }
 
-                form.classList.toggle('hidden', !selected || !!paid);
+                /* Kotak Total/Uang/Kembalian tetap tampil setelah dibayar; hanya kontrol input yang disembunyikan. */
+                form.classList.toggle('hidden', !selected);
+
+                Array.prototype.forEach.call(payControls, function (node) {
+                    node.classList.toggle('hidden', !showControls);
+                });
+
                 afterPay.classList.toggle('hidden', !paid);
                 afterPay.classList.toggle('flex', !!paid);
+
+                printBtn.disabled = !paid;
             }
 
             function renderQueue() {
@@ -472,15 +837,19 @@
             form.addEventListener('change', function () {
                 syncMethod();
                 renderQuick();
+                renderReceipt();
                 renderMoney();
             });
 
-            cashInput.addEventListener('input', renderMoney);
+            cashInput.addEventListener('input', function () {
+                renderReceipt();
+                renderMoney();
+            });
 
             form.addEventListener('submit', function (event) {
                 event.preventDefault();
 
-                if (busy || !selected) {
+                if (busy || !selected || paid) {
                     return;
                 }
 
@@ -513,6 +882,8 @@
                             method: data.metode_pembayaran || METHOD_LABEL[method()]
                         };
 
+                        cashInput.value = paid.cash;
+
                         Kasir.flash(flashEl, 'success', 'Pembayaran berhasil. Kembalian ' + Kasir.rupiah(paid.change) + '.');
 
                         return refresh();
@@ -527,7 +898,12 @@
                     });
             });
 
-            q('[data-print]').addEventListener('click', function () {
+            printBtn.addEventListener('click', function () {
+                if (!paid) {
+                    return;
+                }
+
+                preparePrint();
                 window.print();
             });
 
@@ -545,4 +921,3 @@
         });
     </script>
 @endpush
-

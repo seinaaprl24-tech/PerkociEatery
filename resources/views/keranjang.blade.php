@@ -375,9 +375,6 @@
                 }
             });
 
-            document.querySelector('[data-submit]').addEventListener('click', function () {
-                this.textContent = 'Pesanan Terkirim ke Dapur ✓';
-                this.classList.add('bg-brand-dark');
             function setBusy(state) {
                 busy = state;
                 submitBtn.disabled = state || !tableId;
