@@ -34,6 +34,89 @@
 @endsection
 
 @push('head')
+    {{-- Gaya khusus halaman ini memakai CSS biasa, jadi tampilan tetap rapi walau build Tailwind belum diperbarui. --}}
+    <style>
+        .pay-stack > * + * { margin-top: 20px; }
+
+        /* Kotak TOTAL: label di kiri, angka di kanan */
+        .pay-total {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 20px 28px;
+            border-radius: 16px;
+            background: var(--color-cocoa, #3b2a20);
+            color: #fff;
+        }
+        .pay-total-label {
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: .18em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, .7);
+        }
+        .pay-total-value {
+            font-size: 40px;
+            font-weight: 700;
+            line-height: 1;
+            text-align: right;
+        }
+
+        /* Ubin metode pembayaran */
+        .pay-tiles {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 10px;
+        }
+        .pay-tile {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            padding: 16px 8px;
+            border: 2px solid rgba(59, 42, 32, .12);
+            border-radius: 16px;
+            background: #fff;
+            text-align: center;
+            cursor: pointer;
+            transition: background .15s, border-color .15s;
+        }
+        .pay-tile:hover { background: #f5f1ea; }
+        .pay-tile:has(input:checked) {
+            border-color: var(--color-brand, #1f5c1a);
+            background: rgba(31, 92, 26, .1);
+        }
+        .pay-tile:has(input:focus-visible) { outline: 2px solid rgba(31, 92, 26, .45); outline-offset: 2px; }
+
+        /* Uang diterima + kembalian */
+        .pay-money {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            align-items: stretch;
+        }
+        .pay-box { padding: 14px 16px; border-radius: 16px; }
+        .pay-box-label {
+            display: block;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: .14em;
+            text-transform: uppercase;
+        }
+
+        /* Tombol nominal cepat */
+        .pay-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+        @media (max-width: 640px) {
+            .pay-money { grid-template-columns: 1fr; }
+            .pay-total { padding: 16px 18px; }
+            .pay-total-value { font-size: 32px; }
+        }
+    </style>
+
     {{-- Saat mencetak, hanya struk yang tampil. Ukuran kertas diatur lewat JS sebelum window.print(). --}}
     <style>
         @@media print {
@@ -92,15 +175,16 @@
 
     <p data-flash class="hidden" role="status"></p>
 
-    <div class="mt-5 grid gap-4 xl:grid-cols-[1.35fr_1fr] xl:items-start">
+    {{-- Kiri (2/3): pembayaran. Kanan (1/3): pratinjau struk. --}}
+    <div class="mt-5 grid gap-4 xl:grid-cols-3 xl:items-start">
         {{-- ================= KIRI: Pembayaran ================= --}}
-        <section class="rounded-2xl border border-cocoa/10 bg-white p-5 sm:p-7" aria-label="Pembayaran">
+        <section class="rounded-2xl border border-cocoa/10 bg-white p-5 sm:p-7 xl:col-span-2" aria-label="Pembayaran">
             <div data-summary-empty>
                 <x-ui.empty-state icon="payments" title="Belum ada pesanan dipilih"
                     description="Pilih pesanan dari antrean pembayaran." />
             </div>
 
-            <div class="hidden space-y-5" data-summary>
+            <div class="pay-stack hidden" data-summary>
                 {{-- 1. Nomor pesanan + lencana status --}}
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <h2 class="min-w-0 break-words font-display text-[28px] font-bold leading-tight text-cocoa" data-sum-number>-</h2>
@@ -108,12 +192,12 @@
                 </div>
 
                 {{-- 2. Meja • nama pemesan --}}
-                <p class="-mt-2 text-[14px] text-cocoa/60">
+                <p style="margin-top: 6px" class="text-[14px] text-cocoa/60">
                     <span data-sum-table>-</span><span data-sum-customer></span>
                 </p>
 
                 {{-- 3. Daftar item --}}
-                <div class="rounded-2xl border border-cocoa/10 bg-sand/40 px-4 py-2 sm:px-5">
+                <div class="rounded-2xl border border-cocoa/10 bg-sand/40" style="padding: 4px 20px">
                     <ul class="divide-y divide-cocoa/10" data-sum-lines></ul>
 
                     <div class="flex items-center justify-between gap-4 border-t border-cocoa/15 py-3">
@@ -124,21 +208,21 @@
                     </div>
                 </div>
 
-                {{-- 4. Kotak TOTAL --}}
-                <div data-stat="total" class="rounded-2xl bg-cocoa px-6 py-6 text-center text-white">
-                    <p class="text-[11px] font-bold uppercase tracking-[0.2em] text-white/60">Total</p>
-                    <p class="mt-1.5 font-display text-[40px] font-bold leading-none">Rp 0</p>
+                {{-- 4. Kotak TOTAL: label di samping angka --}}
+                <div data-stat="total" class="pay-total">
+                    <p class="pay-total-label">Total</p>
+                    <p class="pay-total-value font-display">Rp 0</p>
                 </div>
             </div>
 
-            <form data-pay-form id="pay-form" class="mt-6 hidden space-y-5" novalidate>
+            <form data-pay-form id="pay-form" class="pay-stack hidden" style="margin-top: 24px" novalidate>
                 {{-- 5. Metode pembayaran --}}
                 <div data-pay-controls>
                     <p class="text-[11px] font-bold uppercase tracking-[0.16em] text-cocoa/50">Metode Pembayaran</p>
 
-                    <div class="mt-2.5 grid grid-cols-3 gap-2.5 sm:gap-3">
+                    <div class="pay-tiles">
                         @foreach ($methods as $method)
-                            <label class="flex cursor-pointer flex-col items-center gap-1 rounded-2xl border-2 border-cocoa/10 bg-white px-2 py-4 text-center transition hover:bg-sand/60 has-[:checked]:border-brand has-[:checked]:bg-brand/10 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand/40 sm:px-3">
+                            <label class="pay-tile">
                                 <input type="radio" name="metode" value="{{ $method['value'] }}"
                                     @checked($loop->first) class="sr-only">
 
@@ -150,31 +234,26 @@
                     </div>
                 </div>
 
-                {{-- 6. Total / Uang Diterima / Kembalian --}}
-                <div class="grid gap-3 sm:grid-cols-3">
-                    <div class="rounded-2xl bg-sand px-4 py-3.5">
-                        <p class="text-[11px] font-bold uppercase tracking-[0.14em] text-cocoa/50">Total</p>
-                        <p class="mt-1.5 font-display text-[22px] font-bold leading-tight text-cocoa" data-total-mirror>Rp 0</p>
-                    </div>
-
-                    <div data-stat="cash" class="rounded-2xl bg-sand px-4 py-3.5">
-                        <label for="pay-cash" class="block text-[11px] font-bold uppercase tracking-[0.14em] text-cocoa/50">Uang Diterima</label>
+                {{-- 6. Uang diterima + kembalian (Total sudah ada di kotak cokelat di atas) --}}
+                <div class="pay-money">
+                    <div data-stat="cash" class="pay-box bg-sand">
+                        <label for="pay-cash" class="pay-box-label text-cocoa/50">Uang Diterima</label>
                         {{-- Target pengisian script (.font-display); nilai yang tampil ada di input di bawahnya. --}}
                         <span class="font-display sr-only" aria-hidden="true">Rp 0</span>
                         <input id="pay-cash" data-pay-cash type="number" min="0" step="500" inputmode="numeric"
-                            placeholder="0"
-                            class="mt-1.5 w-full rounded-xl border border-cocoa/15 bg-white px-3 py-2 text-[22px] font-bold leading-tight text-cocoa outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/30 read-only:bg-white/60 read-only:text-cocoa/70">
+                            placeholder="0" style="margin-top: 6px"
+                            class="w-full rounded-xl border border-cocoa/15 bg-white px-3 py-2 text-[22px] font-bold leading-tight text-cocoa outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/30 read-only:bg-white/60 read-only:text-cocoa/70">
                     </div>
 
-                    <div data-stat="change" class="rounded-2xl bg-brand px-4 py-3.5 text-white">
-                        <p class="text-[11px] font-bold uppercase tracking-[0.14em] text-white/75">Kembalian</p>
-                        <p class="mt-1.5 font-display text-[22px] font-bold leading-tight">Rp 0</p>
+                    <div data-stat="change" class="pay-box bg-brand text-white">
+                        <p class="pay-box-label text-white/75">Kembalian</p>
+                        <p class="font-display text-[26px] font-bold leading-tight" style="margin-top: 10px">Rp 0</p>
                     </div>
                 </div>
 
                 {{-- 7 & 8. Nominal cepat + konfirmasi --}}
-                <div class="space-y-4" data-pay-controls>
-                    <div class="flex flex-wrap gap-2" data-quick-cash></div>
+                <div class="pay-stack" data-pay-controls>
+                    <div class="pay-chips" data-quick-cash></div>
 
                     <button type="submit" class="btn-primary w-full justify-center py-4 text-[15px]" data-pay-submit>
                         Konfirmasi Pembayaran
@@ -351,7 +430,7 @@
             var sumCustomer = q('[data-sum-customer]');
             var sumLines = q('[data-sum-lines]');
             var sumSubtotal = q('[data-sum-subtotal]');
-            var totalMirror = q('[data-total-mirror]');
+            var totalMirror = q('[data-total-mirror]'); /* opsional: bisa tidak ada */
 
             var receiptEl = q('[data-receipt]');
             var receiptEmpty = q('[data-receipt-empty]');
@@ -686,7 +765,7 @@
                         : 'badge badge-butter shrink-0 whitespace-nowrap';
                 }
 
-                /* Kotak Total/Uang/Kembalian tetap tampil setelah dibayar; hanya kontrol input yang disembunyikan. */
+                /* Kotak Uang/Kembalian tetap tampil setelah dibayar; hanya kontrol input yang disembunyikan. */
                 form.classList.toggle('hidden', !selected);
 
                 Array.prototype.forEach.call(payControls, function (node) {
