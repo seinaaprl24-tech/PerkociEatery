@@ -1,4 +1,4 @@
-{{-- Penyimpan keranjang customer (localStorage). Di-include oleh halaman menu & keranjang. --}}
+{{-- Penyimpan keranjang customer & status pesanan (localStorage). Di-include oleh halaman menu, keranjang, & status. --}}
 <script>
     window.PerkociCart = (function () {
         var KEY = 'perkoci_cart_v1';
@@ -113,6 +113,37 @@
 
             clear: function () {
                 write([]);
+            }
+        };
+    })();
+
+    /* Penyimpan order_id & kode_akses pesanan terakhir untuk halaman /status */
+    window.PerkociOrder = (function () {
+        var KEY = 'perkoci_last_order';
+
+        return {
+            save: function (orderId, kodeAkses) {
+                try {
+                    window.localStorage.setItem(KEY, JSON.stringify({
+                        order_id: orderId,
+                        kode_akses: kodeAkses
+                    }));
+                } catch (e) {}
+            },
+
+            get: function () {
+                try {
+                    var raw = window.localStorage.getItem(KEY);
+                    return raw ? JSON.parse(raw) : null;
+                } catch (e) {
+                    return null;
+                }
+            },
+
+            clear: function () {
+                try {
+                    window.localStorage.removeItem(KEY);
+                } catch (e) {}
             }
         };
     })();
