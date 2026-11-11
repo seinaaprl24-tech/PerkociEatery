@@ -461,10 +461,8 @@
                         PerkociCart.clear();
                         sent = true;
 
-                        successEl.querySelector('[data-success-queue]').textContent = order.nomor_antrean || '-';
-                        successEl.querySelector('[data-success-total]').textContent = rupiah(Number(order.total_harga) || 0);
-                        successEl.classList.remove('hidden');
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                        // Langsung alihkan pelanggan ke halaman /status
+                        window.location.href = '/status';
                     })
                     .catch(function () {
                         showError('Tidak bisa terhubung ke server. Coba lagi sebentar.');
