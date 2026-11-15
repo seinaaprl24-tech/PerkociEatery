@@ -1,383 +1,330 @@
-# Dokumentasi API — PerkociEatery (KlikKopi)
+DOKUMENTASI REST API — PERKOCIEATERY
+Spesifikasi Antarmuka Pemrograman Aplikasi (REST API) Sistem Pemesanan dan Manajemen PerkociEatery.
 
-Dokumen ini untuk tim frontend. Isinya endpoint yang sudah jadi di backend (Laravel 12 + Sanctum), siapa yang boleh mengakses, dan bentuk request/respons.
+================================================================================
+1. INFORMASI DASAR
+================================================================================
+- Base URL (Produksi)   : https://perkocieatery.my.id/api
+- Format Data           : application/json
+- Autentikasi           : Laravel Sanctum (Bearer Token)
+- Header Wajib          : Accept: application/json
+                          Content-Type: application/json
+- Header Terproteksi    : Authorization: Bearer <token>
 
-Tanda di tabel: ✅ = sudah diuji langsung dengan data nyata, 📄 = dibuat dari membaca kode, belum diuji.
+================================================================================
+2. ATURAN KHUSUS & KEAMANAN
+================================================================================
+1. Pembatasan Request (Rate Limiting):
+   - Endpoint Login (POST /login): Maksimal 5 percobaan per menit. Melebihi batas mengembalikan status 429 Too Many Requests.
+   - Endpoint Buat Pesanan (POST /pesanan): Maksimal 20 pesanan per menit. Melebihi batas mengembalikan status 429 Too Many Requests.
 
----
+2. Filter & Paginasi:
+   - Daftar pesanan (GET /pesanan) mendukung filter query parameter ?status=<status> yang dapat dipisah koma (contoh: ?status=menunggu,diproses).
+   - Daftar data mendukung paginasi menggunakan parameter ?per_page=<jumlah> dari 1 sampai 100 (bawaan 10).
 
-## 1. Dasar
+3. Keamanan kode_akses Pesanan:
+   - Field kode_akses (12 karakter acak) dibuat otomatis saat pesanan disimpan dan hanya dikirimkan satu kali pada respons 201 Created (POST /pesanan).
+   - Akses customer ke GET /pesanan/{pesanan} dan GET /pesanan/{id}/struk mewajibkan query parameter ?kode=<kode_akses>. Jika token staf tidak ada dan kode salah atau kosong, server mengembalikan 404 Not Found agar ID pesanan tidak dapat ditebak.
 
-**Base URL (lokal):** `http://127.0.0.1:8000/api`
+================================================================================
+3. DAFTAR ENDPOINT
+================================================================================
 
-**Header untuk semua request:**
+A. Autentikasi & Profil
+- POST      /login                  | Role: Publik (Staf)         | Autentikasi pengguna dan mendapatkan token Sanctum
+- POST      /logout                 | Role: Admin, Manager, Kasir | Menghapus token aktif (keluar sesi)
+- GET       /me                     | Role: Admin, Manager, Kasir | Mendapatkan data profil pengguna yang sedang login
+- GET       /user                   | Role: Admin, Manager, Kasir | Alias dari /me untuk mengambil data pengguna aktif
 
-```
-Accept: application/json
-Content-Type: application/json
-```
+B. Manajemen Pengguna (Users)
+- GET       /users                  | Role: Admin, Manager        | Menampilkan daftar seluruh akun pengguna
+- POST      /users                  | Role: Admin, Manager        | Menambahkan akun pengguna baru
+- GET       /users/{user}           | Role: Admin, Manager        | Menampilkan detail akun pengguna tertentu
+- PUT/PATCH /users/{user}           | Role: Admin, Manager        | Memperbarui data atau role pengguna
+- DELETE    /users/{user}           | Role: Admin, Manager        | Menghapus akun pengguna
 
-**Header tambahan untuk endpoint staff:**
+C. Manajemen Meja & QR Code
+- GET       /meja                   | Role: Publik / Semua Role   | Menampilkan daftar seluruh meja
+- POST      /meja                   | Role: Admin, Manager        | Menambahkan data meja baru
+- GET       /meja/{meja}            | Role: Publik / Semua Role   | Menampilkan detail meja berdasarkan ID
+- PUT/PATCH /meja/{meja}            | Role: Admin, Manager        | Memperbarui informasi atau status meja
+- DELETE    /meja/{meja}            | Role: Admin, Manager        | Menghapus data meja
+- GET       /meja/qr/{kode_qr}      | Role: Customer (Publik)     | Validasi kode QR meja saat customer memindai
+- GET       /meja/validate/{kode_qr}| Role: Customer (Publik)     | Alias validasi kode QR meja
 
-```
-Authorization: Bearer <token dari /api/login>
-```
+D. Produk & Manajemen Stok
+- GET       /produk                 | Role: Publik / Semua Role   | Menampilkan daftar menu/produk
+- POST      /produk                 | Role: Admin, Manager        | Menambahkan menu/produk baru
+- GET       /produk/{produk}        | Role: Publik / Semua Role   | Menampilkan detail menu/produk
+- PUT/PATCH /produk/{produk}        | Role: Admin, Manager        | Memperbarui informasi menu/produk
+- DELETE    /produk/{produk}        | Role: Admin, Manager        | Menghapus menu/produk
+- PATCH     /produk/{produk}/stok   | Role: Admin                 | Memperbarui jumlah_stok, tambah, atau min_stok produk
 
-**Role:** `admin`, `kasir`, `manager`.
+E. Transaksi Pesanan
+- GET       /pesanan                | Role: Admin, Manager, Kasir | Menampilkan daftar pesanan (?status=, ?per_page=)
+- POST      /pesanan                | Role: Customer, Kasir       | Membuat pesanan baru (mengembalikan kode_akses sekali)
+- GET       /pesanan/{pesanan}      | Role: Customer (?kode=), Staf | Melihat detail & status pesanan
+- PATCH     /pesanan/{pesanan}/status | Role: Admin, Manager, Kasir | Mengubah status_pesanan (menunggu, diproses, selesai, batal)
+- DELETE    /pesanan/{pesanan}      | Role: Admin, Manager, Kasir | Membatalkan pesanan (mengembalikan stok) atau menghapus pesanan batal
+- GET       /pesanan/{id}/struk     | Role: Customer (?kode=), Staf | Mengambil data struk pesanan
 
-**Uang** selalu berupa angka (bukan string), contoh `16000`.
+F. Pembayaran
+- GET       /pembayaran             | Role: Admin, Manager, Kasir | Menampilkan riwayat transaksi pembayaran
+- POST      /pembayaran             | Role: Kasir, Admin          | Memproses pembayaran pesanan & mengubah status pesanan menjadi selesai
+- GET       /pembayaran/{pembayaran}| Role: Admin, Manager, Kasir | Menampilkan detail transaksi pembayaran
+- DELETE    /pembayaran/{pembayaran}| Role: Admin, Manager        | Membatalkan pembayaran & mengembalikan status pesanan ke diproses
 
-**Status pesanan:** `menunggu`, `diproses`, `selesai`, `batal`.
+G. Laporan & Statistik
+- GET       /laporan/daily-stats    | Role: Manager, Admin        | Mengambil ringkasan statistik harian
+- GET       /laporan/monthly-income | Role: Manager, Admin        | Mengambil data pendapatan bulanan
+- GET       /laporan/penjualan      | Role: Manager, Admin        | Mengambil laporan detail penjualan
+- GET       /laporan/top-products   | Role: Manager, Admin        | Mengambil daftar produk terlaris
 
-**Pagination:** daftar dibagi 10 data per halaman. Respons berbentuk `{ "data": [...], "links": {...}, "meta": {...} }`. Ambil halaman lain dengan `?page=2`. Gunakan `meta.last_page` untuk tahu jumlah halaman.
+================================================================================
+4. CONTOH REQUEST & RESPONSE ENDPOINT INTI
+================================================================================
 
-**Batas request (throttle):**
+4.1 Login (POST /login)
+Request Body:
+{
+  "email": "kasir@perkocieatery.my.id",
+  "password": "password123"
+}
 
-| Endpoint | Batas |
-|---|---|
-| `POST /api/login` | 5 per menit |
-| `POST /api/pesanan` | 20 per menit |
-
-Kalau terlampaui, respons `429 Too Many Requests`.
-
-### Format error
-
-| Status | Arti | Contoh body |
-|---|---|---|
-| 401 | Belum login / token salah | `{"message":"Unauthenticated."}` |
-| 403 | Login, tapi role tidak boleh | `{"message":"Anda tidak memiliki akses ke halaman ini."}` |
-| 404 | Data tidak ditemukan | `{"message":"..."}` |
-| 422 | Validasi gagal | `{"message":"...","errors":{"field":["pesan"]}}` |
-| 429 | Terlalu banyak request | — |
-
----
-
-## 2. Alur Customer (self order via QR)
-
-Semua endpoint di bagian ini **tanpa login**.
-
-1. Customer scan QR meja → panggil `GET /api/meja/validate/{qr_code}` untuk mendapatkan `id_meja`.
-2. Ambil menu → `GET /api/produk` (ambil semua halaman).
-3. Kirim pesanan → `POST /api/pesanan`. Simpan `id_pesanan` dari respons.
-4. Pantau status → `GET /api/pesanan/{id_pesanan}` (polling berkala).
-5. Setelah dibayar kasir → `GET /api/pesanan/{id_pesanan}/struk`.
-
-### Validasi QR meja
-
-`GET /api/meja/validate/{qr_code}` (alias: `GET /api/meja/qr/{qr_code}`) 📄
-
-Nilai `{qr_code}` adalah kolom `qr_code` pada meja, contoh `MEJA-01`.
-
-Respons 200:
-
-```json
+Response (200 OK):
 {
   "status": "success",
-  "data": { "id_meja": 1, "no_meja": "01", "qr_code": "MEJA-01", "status": "tersedia" }
+  "message": "Login berhasil",
+  "data": {
+    "user": {
+      "id": 2,
+      "name": "Kasir Utama",
+      "email": "kasir@perkocieatery.my.id",
+      "role": "kasir"
+    },
+    "token": "1|aBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890"
+  }
 }
-```
 
-Respons 404: `{"message":"Meja tidak ditemukan atau QR tidak valid."}`
+--------------------------------------------------------------------------------
+4.2 Buat Pesanan (POST /pesanan)
+Catatan: Field kode_akses hanya dikirimkan satu kali pada respons ini. Simpan di sisi client customer untuk mengakses status pesanan dan struk.
 
-### Daftar menu
-
-`GET /api/produk` ✅ · `GET /api/produk/{id_produk}` 📄
-
-Total saat ini 16 produk, jadi menu ada di `?page=1` dan `?page=2`.
-
-```json
+Request Body:
 {
-  "data": [
-    {
-      "id_produk": 11,
-      "nama_produk": "Nasi",
-      "kategori": "Makanan Utama",
-      "harga": 4000,
-      "deskripsi": null,
-      "status": "aktif",
-      "stok": { "id_stok": 11, "jumlah_stok": 50, "min_stok": 0 }
-    }
-  ],
-  "links": { "first": "...", "last": "...", "prev": null, "next": "..." },
-  "meta": { "current_page": 1, "last_page": 2, "per_page": 10, "total": 16 }
-}
-```
-
-Kategori yang ada di data saat ini: `Signature Coffee`, `Non-Kopi & Teh`, `Makanan Utama`, `Snack & Dessert`.
-
-Catatan: `status` produk bisa bukan `aktif`; sembunyikan produk yang tidak aktif atau stoknya 0 di tampilan customer.
-
-### Membuat pesanan
-
-`POST /api/pesanan` ✅ (status 201)
-
-```json
-{
-  "id_meja": 1,
+  "id_meja": 4,
+  "nama_pemesan": "Budi Santoso",
+  "no_whatsapp": "081234567890",
   "items": [
-    { "id_produk": 11, "jumlah": 2 },
-    { "id_produk": 9, "jumlah": 1 }
+    {
+      "id_produk": 1,
+      "jumlah": 2,
+      "gula": "Less Sugar",
+      "es": "Normal Ice",
+      "catatan": "Kopi jangan terlalu pahit"
+    },
+    {
+      "id_produk": 5,
+      "jumlah": 1
+    }
   ]
 }
-```
 
-**Penting tentang harga:** jangan kirim atau hitung harga dari sisi client. Server selalu mengambil harga dari tabel produk dan menghitung `total_harga` sendiri. `harga_satuan` boleh dihilangkan; kalau tetap dikirim, nilainya diabaikan (sudah diuji dengan `harga_satuan: 1`, total tetap benar). Tampilkan total dari respons server.
-
-Batas: maksimal 50 baris item, `jumlah` 1–99 per item. Field opsional per item: `topping`, `gula`, `es`, `catatan`, `customisasi`. Formatnya mengikuti validasi `StorePesananRequest` (belum didokumentasikan di sini).
-
-Respons 201:
-
-```json
+Response (201 Created):
 {
   "data": {
-    "id_pesanan": 1,
-    "id_meja": 1,
-    "meja": { "id_meja": 1, "no_meja": "01", "status": "tersedia" },
-    "nomor_antrean": "ORD-20261026-001",
-    "tanggal_pesan": "2026-10-26T08:28:53.000000Z",
-    "total_harga": 16000,
+    "id_pesanan": 108,
+    "id_meja": 4,
+    "nomor_antrean": "ORD-20261115-001",
+    "nama_pemesan": "Budi Santoso",
+    "no_whatsapp": "081234567890",
+    "kode_akses": "aB9kLm2PqR7x",
+    "tanggal_pesan": "2026-11-15T07:00:00.000000Z",
+    "total_harga": 65000,
     "status_pesanan": "menunggu",
     "detail_pesanan": [
       {
-        "id_detail": 1,
-        "id_produk": 11,
-        "nama_produk": "Nasi",
-        "harga_satuan": 4000,
+        "id_produk": 1,
         "jumlah": 2,
-        "subtotal": 8000,
-        "topping": null, "gula": null, "es": null, "catatan": null,
-        "produk": { "id_produk": 11, "nama_produk": "Nasi", "harga": 4000 }
+        "harga": 20000,
+        "subtotal": 40000,
+        "gula": "Less Sugar",
+        "es": "Normal Ice",
+        "catatan": "Kopi jangan terlalu pahit"
+      },
+      {
+        "id_produk": 5,
+        "jumlah": 1,
+        "harga": 25000,
+        "subtotal": 25000
+      }
+    ]
+  }
+}
+
+--------------------------------------------------------------------------------
+4.3 Lihat Detail Pesanan (GET /pesanan/{pesanan}?kode=aB9kLm2PqR7x)
+Request URL:
+GET https://perkocieatery.my.id/api/pesanan/108?kode=aB9kLm2PqR7x
+
+Response (200 OK):
+{
+  "data": {
+    "id_pesanan": 108,
+    "id_meja": 4,
+    "nomor_antrean": "ORD-20261115-001",
+    "nama_pemesan": "Budi Santoso",
+    "status_pesanan": "diproses",
+    "total_harga": 65000,
+    "detail_pesanan": [
+      {
+        "id_produk": 1,
+        "jumlah": 2,
+        "harga": 20000,
+        "subtotal": 40000
       }
     ],
-    "items": [ "...sama persis dengan detail_pesanan..." ]
+    "pembayaran": null
   }
 }
-```
 
-Catatan bentuk data: `items` isinya sama dengan `detail_pesanan`. Di setiap item, `qty` = `jumlah` dan `harga` = `harga_satuan`. Pakai salah satu saja secara konsisten.
+--------------------------------------------------------------------------------
+4.4 Ubah Status Pesanan (PATCH /pesanan/{pesanan}/status)
+Header: Authorization: Bearer <token>
+Nilai status_pesanan yang valid: menunggu, diproses, selesai, batal
 
-Error yang mungkin:
-
-| Status | Penyebab | Body |
-|---|---|---|
-| 422 | Stok tidak cukup | `{"errors":{"items":["Stok untuk Nasi tidak mencukupi."]}}` |
-| 422 | Field tidak valid | `errors` berisi nama field |
-| 429 | Lebih dari 20 pesanan per menit | — |
-
-Stok otomatis berkurang saat pesanan dibuat dan dikembalikan jika pesanan dibatalkan.
-
-### Status pesanan & struk
-
-`GET /api/pesanan/{id_pesanan}` 📄 — bentuk respons sama dengan respons pembuatan pesanan (`data` berisi pesanan lengkap).
-
-`GET /api/pesanan/{id_pesanan}/struk` 📄
-
-```json
+Request Body:
 {
-  "status": "success",
+  "status_pesanan": "diproses"
+}
+
+Response (200 OK):
+{
   "data": {
-    "info_coffee_shop": { "nama": "PerkociEatery", "alamat": "-", "telepon": "-" },
-    "nomor_antrean": "ORD-20261026-001",
-    "nama_meja": "01",
-    "daftar_item": [ "..." ],
-    "total_harga": 16000,
-    "metode_pembayaran": "Tunai",
-    "kembalian": 4000,
-    "tanggal": "2026-10-26T08:28:53.000000Z",
-    "pembayaran": { "...": "null jika belum dibayar" }
+    "id_pesanan": 108,
+    "nomor_antrean": "ORD-20261115-001",
+    "status_pesanan": "diproses",
+    "total_harga": 65000
   }
 }
-```
 
-Sebelum dibayar, `metode_pembayaran` dan `kembalian` bernilai `null`.
+--------------------------------------------------------------------------------
+4.5 Proses Pembayaran (POST /pembayaran)
+Header: Authorization: Bearer <token>
+Nilai metode_pembayaran yang valid: tunai, qris, transfer, e-wallet
 
----
-
-## 3. Autentikasi Staff
-
-### Login
-
-`POST /api/login` ✅
-
-```json
-{ "username": "kasir", "password": "...", "device_name": "kasir-1" }
-```
-
-`device_name` opsional.
-
-Respons 200:
-
-```json
+Request Body:
 {
-  "message": "Login berhasil.",
-  "user": { "id_user": 2, "nama": "Kasir Perkoci", "username": "kasir", "role": "kasir" },
-  "token": "<simpan, kirim sebagai Bearer token>"
+  "pesanan_id": 108,
+  "metode_pembayaran": "tunai",
+  "jumlah_bayar": 100000
 }
-```
 
-Salah username/password → `422` dengan `errors.username`. Lebih dari 5 percobaan per menit → `429`.
-
-### Lainnya
-
-| Endpoint | Fungsi | Status |
-|---|---|---|
-| `POST /api/logout` | Hapus token yang sedang dipakai | 📄 |
-| `GET /api/me` atau `GET /api/user` | Data user yang sedang login | 📄 |
-
-Akun staff dibuat oleh admin lewat `POST /api/users`. Tidak ada pendaftaran publik.
-
-Akun bawaan dari seeder: `admin`, `kasir`, `manager`. Password-nya diatur di `.env` (`SEED_STAFF_PASSWORD`); tanyakan ke backend.
-
----
-
-## 4. Endpoint Staff
-
-Semua butuh header `Authorization: Bearer <token>`.
-
-### Kasir & Admin
-
-| Method | Endpoint | Fungsi | Status |
-|---|---|---|---|
-| GET | `/api/meja` | Daftar meja (10 per halaman) | ✅ |
-| GET | `/api/meja/{id_meja}` | Detail meja | 📄 |
-| GET | `/api/pesanan` | Daftar pesanan, terbaru dulu. Opsional: `?status=menunggu,diproses` dan `?per_page=1..100` | 📄 |
-| PATCH | `/api/pesanan/{id}/status` | Ubah status pesanan | 📄 |
-| DELETE | `/api/pesanan/{id}` | Batalkan pesanan (stok dikembalikan); panggilan kedua pada pesanan batal akan menghapusnya | 📄 |
-| GET | `/api/pembayaran` | Riwayat pembayaran | 📄 |
-| GET | `/api/pembayaran/{id}` | Detail pembayaran | 📄 |
-| POST | `/api/pembayaran` | Bayar pesanan | ✅ |
-| DELETE | `/api/pembayaran/{id}` | Batalkan pembayaran (pesanan kembali `diproses`) | 📄 |
-
-**Ubah status pesanan:**
-
-```json
-{ "status_pesanan": "diproses" }
-```
-
-Nilai yang diterima: `menunggu`, `diproses`, `selesai`, `batal`. Pesanan yang sudah `batal` tidak bisa diubah lagi (422). Mengubah ke `batal` otomatis mengembalikan stok.
-
-**Bayar pesanan:**
-
-```json
-{ "pesanan_id": 1, "jumlah_bayar": 20000, "metode_pembayaran": "tunai" }
-```
-
-`metode_pembayaran` yang diterima: `tunai`, `qris`, `transfer`, `e-wallet`.
-
-Respons 201:
-
-```json
+Response (201 Created):
 {
   "data": {
-    "id_pembayaran": 1,
-    "id_pesanan": 1,
-    "pesanan": { "id_pesanan": 1, "nomor_antrean": "ORD-20261026-001", "total_harga": 16000, "status_pesanan": "selesai" },
-    "metode_pembayaran": "Tunai",
-    "jumlah_bayar": 20000,
-    "kembalian": 4000,
+    "id_pembayaran": 89,
+    "id_pesanan": 108,
+    "jumlah_bayar": 100000,
+    "kembalian": 35000,
     "status_pembayaran": "lunas",
-    "tanggal_pembayaran": "2026-10-26T08:29:38.000000Z"
+    "tanggal_pembayaran": "2026-11-15T07:12:00.000000Z"
   }
 }
-```
 
-Setelah dibayar, status pesanan otomatis menjadi `selesai`.
+--------------------------------------------------------------------------------
+4.6 Update Stok Produk (PATCH /produk/{produk}/stok)
+Header: Authorization: Bearer <token> (Khusus role admin)
+Parameter Body (isi minimal satu): jumlah_stok, tambah, atau min_stok.
 
-Error 422 yang mungkin (di `errors`):
+Request Body:
+{
+  "jumlah_stok": 25,
+  "min_stok": 5
+}
 
-| Field | Pesan |
-|---|---|
-| `pesanan_id` | Pesanan tidak ditemukan / Pesanan tidak dapat dibayar / Pembayaran untuk pesanan ini sudah ada |
-| `jumlah_bayar` | Jumlah bayar kurang dari total harga |
-| `metode_pembayaran` | Metode pembayaran tidak dikenal |
+Response (200 OK):
+{
+  "message": "Stok berhasil diperbarui.",
+  "data": {
+    "id_produk": 1,
+    "nama_produk": "Kopi Susu Perkoci",
+    "stok": {
+      "id_stok": 1,
+      "jumlah_stok": 25,
+      "min_stok": 5,
+      "updated_at": "2026-11-15 07:15:00"
+    }
+  }
+}
 
-### Admin saja
+--------------------------------------------------------------------------------
+4.7 Laporan Penjualan (GET /laporan/penjualan)
+Header: Authorization: Bearer <token>
 
-| Method | Endpoint | Fungsi | Status |
-|---|---|---|---|
-| POST | `/api/produk` | Tambah produk | 📄 |
-| PUT/PATCH | `/api/produk/{id}` | Ubah produk | 📄 |
-| DELETE | `/api/produk/{id}` | Hapus produk | 📄 |
-| POST | `/api/meja` | Tambah meja | 📄 |
-| PUT/PATCH | `/api/meja/{id}` | Ubah meja | 📄 |
-| DELETE | `/api/meja/{id}` | Hapus meja | 📄 |
-| GET | `/api/users` | Daftar user | ✅ |
-| POST | `/api/users` | Tambah user | 📄 |
-| GET | `/api/users/{id}` | Detail user | 📄 |
-| PUT/PATCH | `/api/users/{id}` | Ubah user | ✅ |
-| DELETE | `/api/users/{id}` | Hapus user | 📄 |
+Request URL:
+GET https://perkocieatery.my.id/api/laporan/penjualan?tanggal_mulai=2026-11-01&tanggal_selesai=2026-11-15
 
-Isi body produk dan meja mengikuti `StoreProdukRequest` dan `StoreMejaRequest` (belum dicantumkan di sini). Untuk meja, `kode_qr`/`qr_code` boleh dikosongkan, server membuat kode acak.
-
-**Tambah user:**
-
-```json
-{ "nama": "Budi", "username": "budi", "password": "minimal6", "role": "kasir" }
-```
-
-`role`: `admin`, `kasir`, atau `manager`. Password minimal 6 karakter.
-
-**Ubah user:** semua field opsional. `password` kosong berarti password tidak diganti. Mengganti password atau role membuat semua token user itu dihapus (harus login ulang).
-
-**Hapus user:** `422` jika menghapus akun sendiri, `409` jika user sudah punya data transaksi.
-
-### Manager & Admin — Laporan
-
-| Method | Endpoint | Fungsi | Status |
-|---|---|---|---|
-| GET | `/api/laporan/daily-stats` | Statistik hari ini | ✅ |
-| GET | `/api/laporan/top-products` | 5 produk terlaris | 📄 |
-| GET | `/api/laporan/monthly-income` | Pemasukan bulan ini | 📄 |
-| GET | `/api/laporan/penjualan?start_date=...&end_date=...` | Laporan per periode | 📄 |
-
-Contoh `daily-stats`:
-
-```json
-{ "tanggal": "2026-10-26", "total_pemasukan": 16000, "jumlah_pesanan_diproses": 0, "jumlah_pesanan_selesai": 1 }
-```
-
-`top-products`: `{ "data": [{ "id_produk", "nama_produk", "kategori", "harga", "total_terjual", "total_pendapatan" }] }`
-
-`monthly-income`: `{ "bulan": "2026-10", "total_pemasukan": 16000 }`
-
-`penjualan`: format tanggal `YYYY-MM-DD`; `end_date` tidak boleh sebelum `start_date`. Respons:
-
-```json
+Response (200 OK):
 {
   "status": "success",
-  "start_date": "2026-10-01",
-  "end_date": "2026-10-26",
-  "total_transaksi": 1,
-  "total_pendapatan": 16000,
-  "data": [ "...pesanan selesai lengkap dengan meja, detail_pesanan, pembayaran..." ]
+  "data": {
+    "periode": {
+      "mulai": "2026-11-01",
+      "selesai": "2026-11-15"
+    },
+    "total_transaksi": 142,
+    "total_pendapatan": 8450000
+  }
 }
-```
 
-**Cara hitung:** pemasukan = `jumlah_bayar` dikurangi `kembalian` dari pembayaran berstatus `lunas`. Hanya pesanan `selesai` yang dihitung di laporan.
+================================================================================
+5. KODE STATUS HTTP & FORMAT ERROR
+================================================================================
 
----
+1. 401 Unauthorized (Tidak Terautentikasi)
+   Penyebab: Token Sanctum tidak dikirim, tidak valid, atau sudah kedaluwarsa.
+   Contoh Response:
+   {
+     "message": "Unauthenticated."
+   }
 
-## 5. Login Halaman Web (Blade) vs API
+2. 403 Forbidden (Akses Ditolak)
+   Penyebab: Role (customer, kasir, admin, manager) tidak memiliki hak akses pada endpoint tersebut.
+   Contoh Response:
+   {
+     "message": "Forbidden."
+   }
 
-Ada dua sistem login yang berdiri terpisah:
+3. 404 Not Found (Tidak Ditemukan)
+   Penyebab: Data tidak ditemukan, atau akses customer ke /pesanan/{id} tanpa kode_akses yang valid.
+   Contoh Response:
+   {
+     "message": "No query results for model [App\\Models\\Pesanan]."
+   }
 
-| | Halaman web (Blade) | API |
-|---|---|---|
-| Login | `POST /login` (form, session) | `POST /api/login` (token) |
-| Field | `username`, `password`, `remember` | `username`, `password` |
-| Setelah login | Redirect ke `/admin`, `/kasir`, atau `/manager` sesuai role | Mengembalikan `token` |
-| Logout | `POST /logout` (form dengan `@csrf`) | `POST /api/logout` |
+4. 409 Conflict (Konflik Data)
+   Penyebab: Mencoba menghapus/membatalkan pesanan (DELETE /pesanan/{id}) yang statusnya sudah selesai (sudah dibayar).
+   Contoh Response:
+   {
+     "message": "Pesanan yang sudah dibayar tidak dapat dibatalkan atau dihapus."
+   }
 
-Login lewat halaman web **belum otomatis** memberi akses ke API. Cara halaman dashboard memanggil API (memakai token Bearer atau cookie session) **belum diputuskan** dan perlu disepakati antara backend dan frontend sebelum dashboard dihubungkan ke data nyata.
+5. 422 Unprocessable Entity (Validasi Gagal)
+   Penyebab: Input tidak valid, stok tidak mencukupi, jumlah_bayar kurang dari total_harga, atau pesanan sudah lunas.
+   Contoh Response:
+   {
+     "message": "Stok untuk Kopi Susu Perkoci tidak mencukupi.",
+     "errors": {
+       "items": [
+         "Stok untuk Kopi Susu Perkoci tidak mencukupi."
+       ]
+     }
+   }
 
-Dashboard `/admin`, `/kasir`, `/manager` saat ini masih menampilkan data contoh dari `config/preview.php`.
-
----
-
-## 6. Hal yang Belum Lengkap
-
-- Isi body `POST/PUT /api/produk` dan `/api/meja` (tergantung Form Request).
-- Format `topping`, `gula`, `es`, `customisasi` pada item pesanan.
-- Status meja (`tersedia`/terisi) belum berubah otomatis saat ada pesanan.
-- Struk dan status pesanan masih bisa dibuka siapa saja yang tahu `id_pesanan`.
-- Tabel `transaksi`, `pemasukan`, `pengeluaran` dari ERD belum terisi oleh alur pembayaran.
+6. 429 Too Many Requests (Melebihi Batas Request)
+   Penyebab: Terkena rate limit (POST /login > 5x/menit atau POST /pesanan > 20x/menit).
+   Contoh Response:
+   {
+     "message": "Too Many Attempts."
+   }
