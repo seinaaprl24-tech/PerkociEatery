@@ -81,8 +81,8 @@
                         <label class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">
                             Username *
                         </label>
-                        <input type="text" name="username" required placeholder="kasir"
-                            class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:bg-white focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100 transition duration-200">
+                        <input type="text" name="username" required placeholder="Masukkan username" autocomplete="off"
+       class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:bg-white focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100 transition duration-200">
                     </div>
 
                     <div>
@@ -92,8 +92,8 @@
                             </label>
                             <a href="#" class="text-xs font-medium text-emerald-700 hover:underline">Lupa password?</a>
                         </div>
-                        <input type="password" name="password" required placeholder="••••••••"
-                            class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:bg-white focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100 transition duration-200">
+                        <input type="password" name="password" required placeholder="Masukkan password" autocomplete="new-password"
+       class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:bg-white focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100 transition duration-200">
                     </div>
 
                     <div class="flex items-center">
