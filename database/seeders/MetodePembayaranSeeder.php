@@ -6,13 +6,13 @@ use App\Models\MetodePembayaran;
 use Illuminate\Database\Seeder;
 
 /**
- * Metode pembayaran sesuai proposal: Tunai, QRIS, E-Wallet.
+ * Metode pembayaran: Tunai dan QRIS.
  */
 class MetodePembayaranSeeder extends Seeder
 {
     public function run(): void
     {
-        $methods = ['Tunai', 'QRIS', 'E-Wallet'];
+        $methods = ['Tunai', 'QRIS'];
 
         foreach ($methods as $namaMetode) {
             MetodePembayaran::updateOrCreate(['nama_metode' => $namaMetode]);

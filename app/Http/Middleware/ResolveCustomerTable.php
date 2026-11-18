@@ -7,14 +7,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-/**
- * Menentukan meja aktif customer.
- *
- * - Link QR berbentuk  /menu?meja=MEJA-01  (nilai = kolom qr_code pada meja).
- * - Meja yang valid disimpan di sesi, jadi halaman lain tidak perlu parameter.
- * - Hasilnya ditulis ke config('perkoci.table') supaya semua view yang
- *   sudah memakai config tersebut otomatis menampilkan meja yang benar.
- */
+
 class ResolveCustomerTable
 {
     public function handle(Request $request, Closure $next): Response

@@ -340,27 +340,20 @@ return [
         'demo_note' => 'Data contoh — halaman frontend belum terhubung ke backend.',
     ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Pembayaran
-    |--------------------------------------------------------------------------
-    | Total transaksi mengikuti harga menu (tanpa biaya tambahan).
-    */
-    'payment_methods' => [
+'payment_methods' => [
         [
-            'value' => 'cashier',
+            'value' => 'tunai',
             'label' => 'Bayar di Kasir',
-            'meta' => 'Tunai, kartu debit/kredit, atau QRIS di meja',
+            'meta' => 'Bayar tunai langsung di meja kasir',
             'default' => true,
         ],
         [
             'value' => 'qris',
-            'label' => 'QRIS / E-Wallet Dinamis',
-            'meta' => 'Scan QR dinamis yang berlaku 5 menit',
+            'label' => 'QRIS',
+            'meta' => 'Scan QRIS DANA Bisnis & bayar langsung dari HP',
             'default' => false,
         ],
     ],
-
     'customer' => [
         'name_label' => 'Nama Pemesan',
         'name_placeholder' => 'Contoh: Rani',

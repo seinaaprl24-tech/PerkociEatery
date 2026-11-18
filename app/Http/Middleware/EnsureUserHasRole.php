@@ -8,10 +8,10 @@ use Symfony\Component\HttpFoundation\Response;
 
 class EnsureUserHasRole
 {
-    
+
     public function handle(Request $request, Closure $next, string ...$roles): Response
     {
-        // Belum login (mis. sesi kedaluwarsa): arahkan ke login, bukan 403.
+        
         if (! $request->user()) {
             return redirect()->route('login');
         }

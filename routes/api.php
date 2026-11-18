@@ -21,6 +21,7 @@ Route::get('/produk', [ProdukController::class, 'index']);
 Route::get('/produk/{produk}', [ProdukController::class, 'show']);
 
 Route::post('/pesanan', [PesananController::class, 'store'])->middleware('throttle:20,1');
+Route::post('/pesanan/{pesanan}/konfirmasi-qris', [PesananController::class, 'konfirmasiQris'])->middleware('throttle:20,1');
 Route::get('/pesanan/{pesanan}', [PesananController::class, 'show']);
 Route::get('/pesanan/{id}/struk', [PesananController::class, 'cetakStruk']);
 
@@ -39,6 +40,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::apiResource('pesanan', PesananController::class)->only(['index', 'destroy']);
         Route::patch('pesanan/{pesanan}/status', [PesananController::class, 'update_status']);
+        Route::post('pesanan/{pesanan}/tolak-qris', [PesananController::class, 'tolakQris']);
 
         Route::apiResource('pembayaran', PembayaranController::class)
             ->only(['index', 'show', 'store', 'destroy']);
@@ -51,7 +53,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('users', UserController::class);
         Route::patch('produk/{produk}/stok', [\App\Http\Controllers\StokController::class, 'update']);
     });
-
 
     // Manager & admin: laporan
     Route::middleware('role:manager,admin')->prefix('laporan')->group(function () {

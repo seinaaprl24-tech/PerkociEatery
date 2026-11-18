@@ -1,8 +1,6 @@
 {{-- Helper bersama halaman manager. Bergantung pada window.StaffApi (dari layouts/staff). --}}
 <script>
     window.Manager = (function () {
-        var MAX_DAYS = 120;
-
         function rupiah(value) {
             return 'Rp ' + (Number(value) || 0).toLocaleString('id-ID');
         }
@@ -96,6 +94,17 @@
                 return { start: ymd(new Date(today.getFullYear(), today.getMonth(), 1)), end: ymd(today) };
             }
 
+            if (name === 'year') {
+                return { start: ymd(new Date(today.getFullYear(), 0, 1)), end: ymd(today) };
+            }
+
+            if (name === 'last_year') {
+                return {
+                    start: ymd(new Date(today.getFullYear() - 1, 0, 1)),
+                    end: ymd(new Date(today.getFullYear() - 1, 11, 31))
+                };
+            }
+
             return { start: ymd(addDays(today, -6)), end: ymd(today) };
         }
 
@@ -106,10 +115,6 @@
 
             if (parseYmd(end) < parseYmd(start)) {
                 return 'Tanggal akhir tidak boleh sebelum tanggal mulai.';
-            }
-
-            if ((parseYmd(end) - parseYmd(start)) / 86400000 > MAX_DAYS) {
-                return 'Rentang maksimal ' + MAX_DAYS + ' hari.';
             }
 
             return null;
@@ -273,6 +278,8 @@
                 return Math.max(highest, day.revenue);
             }, 0);
 
+            var showLabels = days.length <= 14;
+
             days.forEach(function (day) {
                 var column = make('div', 'flex min-w-0 flex-1 flex-col items-center gap-2');
                 var track = make('div', 'flex h-36 w-full items-end');
@@ -283,7 +290,11 @@
                 bar.title = longDay(day.date) + ': ' + rupiah(day.revenue) + ' (' + day.orders + ' pesanan)';
                 track.appendChild(bar);
                 column.appendChild(track);
-                column.appendChild(make('span', 'text-[10px] font-semibold text-cocoa/40', shortDay(day.date)));
+
+                if (showLabels) {
+                    column.appendChild(make('span', 'text-[10px] font-semibold text-cocoa/40', shortDay(day.date)));
+                }
+
                 container.appendChild(column);
             });
         }

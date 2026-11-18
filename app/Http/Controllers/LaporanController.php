@@ -73,28 +73,45 @@ class LaporanController extends Controller
         $validated = $request->validate([
             'start_date' => ['required', 'date'],
             'end_date' => ['required', 'date', 'after_or_equal:start_date'],
+            'metode' => ['nullable', 'string'],
         ]);
 
         $start = Carbon::parse($validated['start_date'])->startOfDay();
         $end = Carbon::parse($validated['end_date'])->endOfDay();
+        $metode = $validated['metode'] ?? null;
 
         // Laporan penjualan = pesanan yang sudah selesai (sudah dibayar).
         $pesananSelesai = Pesanan::whereBetween('tanggal_pesan', [$start, $end])
             ->where('status_pesanan', 'selesai');
+
+        if ($metode && strtolower($metode) !== 'all') {
+            $pesananSelesai->whereHas('pembayaran.metodePembayaran', function ($query) use ($metode) {
+                $query->whereRaw('LOWER(nama_metode) LIKE ?', ['%' . strtolower($metode) . '%']);
+            });
+        }
 
         $totalTransaksi = (clone $pesananSelesai)->count();
 
         $transaksi = (clone $pesananSelesai)
             ->with(['meja', 'detailPesanan.produk', 'pembayaran.metodePembayaran'])
             ->orderByDesc('tanggal_pesan')
-            ->get();
+            ->get()
+            ->map(function (Pesanan $pesanan) {
+                $item = $pesanan->toArray();
+                $item['bukti_bayar_url'] = $pesanan->bukti_bayar
+                    ? asset('storage/' . ltrim($pesanan->bukti_bayar, '/'))
+                    : null;
+
+                return $item;
+            });
 
         return response()->json([
             'status' => 'success',
             'start_date' => $start->toDateString(),
             'end_date' => $end->toDateString(),
+            'metode' => $metode ?: 'all',
             'total_transaksi' => $totalTransaksi,
-            'total_pendapatan' => $this->hitungPemasukan($start, $end),
+            'total_pendapatan' => $this->hitungPemasukan($start, $end, $metode),
             'data' => $transaksi,
         ]);
     }
@@ -103,10 +120,17 @@ class LaporanController extends Controller
      * Pemasukan bersih dari pembayaran lunas: jumlah_bayar dikurangi kembalian.
      * (jumlah_bayar adalah uang yang diserahkan customer, belum dipotong kembalian.)
      */
-    private function hitungPemasukan(Carbon $start, Carbon $end): float
+    private function hitungPemasukan(Carbon $start, Carbon $end, ?string $metode = null): float
     {
-        return (float) Pembayaran::whereBetween('tanggal_pembayaran', [$start, $end])
-            ->where('status_pembayaran', 'lunas')
-            ->sum(DB::raw('jumlah_bayar - COALESCE(kembalian, 0)'));
+        $query = Pembayaran::whereBetween('tanggal_pembayaran', [$start, $end])
+            ->where('status_pembayaran', 'lunas');
+
+        if ($metode && strtolower($metode) !== 'all') {
+            $query->whereHas('metodePembayaran', function ($q) use ($metode) {
+                $q->whereRaw('LOWER(nama_metode) LIKE ?', ['%' . strtolower($metode) . '%']);
+            });
+        }
+
+        return (float) $query->sum(DB::raw('jumlah_bayar - COALESCE(kembalian, 0)'));
     }
 }

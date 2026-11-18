@@ -178,8 +178,19 @@
                     tr.appendChild(Manager.make('td', 'min-w-[220px] text-cocoa/70', Manager.menuSummary(order)));
                     tr.appendChild(Manager.make('td', 'whitespace-nowrap font-semibold text-cocoa', Manager.rupiah(order.total_harga)));
 
-                    var methodCell = Manager.make('td');
+                    var methodCell = Manager.make('td', 'whitespace-nowrap');
                     methodCell.appendChild(Manager.badge('neutral', Manager.methodName(order)));
+
+                    if (order.bukti_bayar_url) {
+                        var proofLink = Manager.make('a',
+                            'ml-1.5 inline-block rounded-lg border border-brand/30 bg-brand/[0.06] px-2 py-0.5 text-[10.5px] font-bold text-brand hover:bg-brand/15',
+                            'Bukti');
+                        proofLink.href = order.bukti_bayar_url;
+                        proofLink.target = '_blank';
+                        proofLink.rel = 'noopener';
+                        methodCell.appendChild(proofLink);
+                    }
+
                     tr.appendChild(methodCell);
 
                     tr.appendChild(Manager.make('td', 'whitespace-nowrap', Manager.timeLabel(order.tanggal_pesan)));

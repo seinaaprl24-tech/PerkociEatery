@@ -1,5 +1,39 @@
 @extends('layouts.app')
 
+@push('head')
+    <style>
+        /* Pastikan modal dan gambar QRIS selalu proporsional & tidak melar */
+        [data-qris-modal] {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            background: rgba(59, 42, 32, 0.65);
+            padding: 16px;
+            align-items: center;
+            justify-content: center;
+            overflow-y: auto;
+        }
+        [data-qris-modal] .qris-dialog {
+            width: 100%;
+            max-width: 390px;
+            margin: auto;
+            border-radius: 24px;
+            background: #ffffff;
+            padding: 20px;
+            box-shadow: 0 20px 45px rgba(0, 0, 0, 0.22);
+        }
+        [data-qris-modal] img {
+            width: 210px !important;
+            height: 210px !important;
+            max-width: 210px !important;
+            object-fit: contain !important;
+            display: block !important;
+            margin: 0 auto !important;
+            border-radius: 12px;
+        }
+    </style>
+@endpush
+
 @section('body')
     @php
         $table = config('perkoci.table');
