@@ -49,7 +49,7 @@ Route::post('/logout', [WebAuthController::class, 'logout'])->name('logout');
 
 $staffPages = [
     'kasir' => ['orders', 'payments', 'tables'],
-    'admin' => ['menu', 'tables', 'inventory', 'users', 'settings'],
+    'admin' => ['menu', 'tables', 'inventory', 'users'],
     'manager' => ['reports', 'finance', 'export'],
 ];
 

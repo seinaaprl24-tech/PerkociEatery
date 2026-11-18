@@ -340,7 +340,7 @@ return [
         'demo_note' => 'Data contoh — halaman frontend belum terhubung ke backend.',
     ],
 
-'payment_methods' => [
+    'payment_methods' => [
         [
             'value' => 'tunai',
             'label' => 'Bayar di Kasir',
@@ -354,6 +354,7 @@ return [
             'default' => false,
         ],
     ],
+
     'customer' => [
         'name_label' => 'Nama Pemesan',
         'name_placeholder' => 'Contoh: Rani',
@@ -489,13 +490,6 @@ return [
                 'key' => 'users',
                 'label' => 'Pengguna',
                 'icon' => 'group',
-                'href' => '#',
-                'roles' => ['admin'],
-            ],
-            [
-                'key' => 'settings',
-                'label' => 'Pengaturan',
-                'icon' => 'settings',
                 'href' => '#',
                 'roles' => ['admin'],
             ],
