@@ -97,7 +97,7 @@ class Perkoci
                 'category' => $category,
                 'unit' => $fallback['unit'] ?? ($category === 'minuman' ? 'gelas' : 'porsi'),
                 'image' => $produk->foto
-                    ? Storage::disk('public')->url($produk->foto)
+                    ? asset('storage/' . ltrim($produk->foto, '/'))
                     : (self::imagePath($slug) ?? self::imagePath($alias)),
                 'stock' => $stock,
                 'available' => $stock > 0,

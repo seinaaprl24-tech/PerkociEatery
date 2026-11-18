@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -22,15 +23,20 @@ class PesananController extends Controller
 {
     /**
      * Daftar pesanan, terbaru dulu.
-     *
-     * Parameter opsional:
-     * - status   : satu atau beberapa status dipisah koma, mis. ?status=menunggu,diproses
-     * - per_page : jumlah per halaman, 1 sampai 100 (bawaan 10)
+     * Pesanan QRIS yang belum upload bukti bayar tidak ditampilkan ke kasir/dapur.
      */
     public function index(Request $request): AnonymousResourceCollection
     {
         $query = Pesanan::with(['meja', 'detailPesanan.produk'])
             ->orderByDesc('id_pesanan');
+
+        if (Schema::hasColumn('pesanan', 'metode_pembayaran') && Schema::hasColumn('pesanan', 'status_pembayaran')) {
+            $query->where(function ($q) {
+                $q->where('metode_pembayaran', '!=', 'qris')
+                    ->orWhereNull('metode_pembayaran')
+                    ->orWhere('status_pembayaran', '!=', 'belum_bayar');
+            });
+        }
 
         $status = $request->query('status');
 
@@ -54,6 +60,10 @@ class PesananController extends Controller
     {
         $validated = $request->validated();
 
+        if (! isset($validated['metode_pembayaran'])) {
+            $validated['metode_pembayaran'] = $request->input('metode_pembayaran', 'tunai');
+        }
+
         $pesanan = null;
 
         for ($percobaan = 1; $percobaan <= 3; $percobaan++) {
@@ -76,7 +86,7 @@ class PesananController extends Controller
     private function simpanPesanan(array $validated): Pesanan
     {
         return DB::transaction(function () use ($validated) {
-            $pesanan = Pesanan::create([
+            $dataPesanan = [
                 'id_meja' => $validated['id_meja'],
                 'nomor_antrean' => $this->generateNomorAntrean(),
                 'nama_pemesan' => $validated['nama_pemesan'] ?? null,
@@ -85,7 +95,17 @@ class PesananController extends Controller
                 'tanggal_pesan' => Carbon::now(),
                 'total_harga' => 0,
                 'status_pesanan' => 'menunggu',
-            ]);
+            ];
+
+            if (Schema::hasColumn('pesanan', 'metode_pembayaran')) {
+                $dataPesanan['metode_pembayaran'] = $validated['metode_pembayaran'] ?? 'tunai';
+            }
+
+            if (Schema::hasColumn('pesanan', 'status_pembayaran')) {
+                $dataPesanan['status_pembayaran'] = 'belum_bayar';
+            }
+
+            $pesanan = Pesanan::create($dataPesanan);
 
             $totalHarga = 0;
 
@@ -134,6 +154,65 @@ class PesananController extends Controller
         });
     }
 
+    /**
+     * Customer wajib mengunggah bukti transfer QRIS agar pesanan diteruskan ke kasir.
+     */
+    public function konfirmasiQris(Request $request, Pesanan $pesanan): JsonResponse
+    {
+        $this->authorizeAccess($request, $pesanan);
+
+        $request->validate([
+            'bukti_bayar' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+        ], [
+            'bukti_bayar.required' => 'Wajib unggah foto/screenshot bukti pembayaran QRIS terlebih dahulu.',
+            'bukti_bayar.image' => 'File bukti pembayaran harus berupa gambar.',
+            'bukti_bayar.mimes' => 'Format gambar bukti pembayaran harus JPG, JPEG, PNG, atau WEBP.',
+            'bukti_bayar.max' => 'Ukuran file bukti pembayaran maksimal 5 MB.',
+        ]);
+
+        $path = $request->file('bukti_bayar')->store('bukti-qris', 'public');
+
+        $updates = [];
+
+        if (Schema::hasColumn('pesanan', 'metode_pembayaran')) {
+            $updates['metode_pembayaran'] = 'qris';
+        }
+
+        if (Schema::hasColumn('pesanan', 'status_pembayaran')) {
+            $updates['status_pembayaran'] = 'menunggu_verifikasi';
+        }
+
+        if (Schema::hasColumn('pesanan', 'bukti_bayar')) {
+            $updates['bukti_bayar'] = $path;
+        }
+
+        if (! empty($updates)) {
+            $pesanan->update($updates);
+        }
+
+        return response()->json([
+            'message' => 'Bukti pembayaran QRIS berhasil dikirim. Menunggu verifikasi kasir.',
+            'data' => new PesananResource($pesanan->fresh(['meja', 'detailPesanan.produk'])),
+        ]);
+    }
+
+    /**
+     * Kasir menolak bukti pembayaran QRIS yang tidak valid.
+     */
+    public function tolakQris(Pesanan $pesanan): JsonResponse
+    {
+        if (Schema::hasColumn('pesanan', 'status_pembayaran')) {
+            $pesanan->update([
+                'status_pembayaran' => 'ditolak',
+            ]);
+        }
+
+        return response()->json([
+            'message' => 'Bukti pembayaran QRIS ditolak. Pelanggan diminta mengunggah ulang.',
+            'data' => new PesananResource($pesanan->fresh(['meja', 'detailPesanan.produk'])),
+        ]);
+    }
+
     public function update_status(Request $request, Pesanan $pesanan): PesananResource
     {
         $validated = $request->validate([
@@ -143,10 +222,6 @@ class PesananController extends Controller
         $statusBaru = $validated['status_pesanan'];
         $statusLama = $pesanan->status_pesanan;
 
-        // Pesanan yang sudah batal tidak boleh diubah lagi
-        // (mencegah stok dikembalikan dua kali).
-        // Pesanan yang sudah dibayar tidak boleh dibatalkan/diubah, supaya laporan
-        // pemasukan tidak menyimpang dari status pesanan.
         if ($statusLama === 'selesai' && $statusBaru !== 'selesai') {
             throw ValidationException::withMessages([
                 'status_pesanan' => ['Pesanan yang sudah dibayar tidak dapat diubah atau dibatalkan. Batalkan pembayarannya terlebih dahulu.'],
@@ -238,11 +313,6 @@ class PesananController extends Controller
         ]);
     }
 
-    /**
-     * Pesanan hanya boleh dibuka oleh staff yang login, atau oleh pemesan yang
-     * membawa kode_akses yang benar (?kode=...). Selain itu dijawab 404 supaya
-     * keberadaan pesanan tidak bisa ditebak dari ID.
-     */
     private function authorizeAccess(Request $request, Pesanan $pesanan): void
     {
         $user = $request->user('sanctum');
@@ -259,9 +329,6 @@ class PesananController extends Controller
         }
     }
 
-    /**
-     * Kembalikan stok semua item pada pesanan (dipakai saat pesanan dibatalkan).
-     */
     private function kembalikanStok(Pesanan $pesanan): void
     {
         $pesanan->loadMissing('detailPesanan');
@@ -275,11 +342,6 @@ class PesananController extends Controller
         }
     }
 
-    /**
-     * Nomor antrean harian: ORD-YYYYMMDD-001, 002, ...
-     * Memakai nomor TERBESAR hari ini (bukan jumlah baris), jadi tetap aman
-     * walaupun ada pesanan yang pernah dihapus.
-     */
     private function generateNomorAntrean(): string
     {
         $prefix = 'ORD-'.Carbon::now()->format('Ymd').'-';

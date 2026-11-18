@@ -9,16 +9,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
-/**
- * Stok per produk (bukan stok bahan baku).
- *
- * PATCH /api/produk/{produk}/stok  (khusus admin)
- *
- * Body (isi minimal satu):
- * - jumlah_stok : atur jumlah stok menjadi nilai ini
- * - tambah      : tambah (atau kurangi, jika negatif) dari stok saat ini; hasil tidak kurang dari 0
- * - min_stok    : batas stok minimum untuk peringatan "menipis"
- */
 class StokController extends Controller
 {
     public function update(Request $request, Produk $produk): JsonResponse

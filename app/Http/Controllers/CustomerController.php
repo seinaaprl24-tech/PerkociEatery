@@ -1,8 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
-
-use App\Models\Pesanan; // Sesuaikan jika nama model pesanan kamu berbeda (misal: Order)
+use App\Models\Pesanan;
 use App\Support\Perkoci;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -30,7 +29,7 @@ class CustomerController extends Controller
     /** Detail menu + varian. */
     public function menuShow(string $slug): View
     {
-        $item = Perkoci::menuBySlug($slug);
+        $item =Perkoci::menuBySlug($slug);
 
         abort_if($item === null, 404);
 
@@ -56,10 +55,7 @@ class CustomerController extends Controller
         return view('status');
     }
 
-    /**
-     * Endpoint API untuk mengambil status pesanan secara dinamis (Polling).
-     * Diakses via GET /api/pesanan/{id}?kode={kode_akses}
-     */
+
     public function getStatusApi(Request $request, string $id): JsonResponse
     {
         $kodeAkses = $request->query('kode');

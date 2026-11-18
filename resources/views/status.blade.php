@@ -61,6 +61,58 @@
                 </div>
             </section>
 
+           {{-- =================== PEMBAYARAN QRIS (Hanya tampil jika metode QRIS) ================== --}}
+            <section id="qris-payment-card" class="card mt-3 hidden p-5">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <h2 class="font-display text-[16px] font-bold leading-tight text-cocoa">Pembayaran QRIS</h2>
+                        <p class="mt-1 text-[12px] font-semibold text-cocoa/55">DANA Bisnis · Perkoci Eatery</p>
+                    </div>
+
+                    <span id="payment-status-pill" class="pill shrink-0 bg-butter text-cocoa">
+                        <span class="ms text-[12px] leading-none">schedule</span>
+                        <span id="payment-status-text">Menunggu Verifikasi</span>
+                    </span>
+                </div>
+
+                <div class="mt-4 rounded-2xl bg-sand p-4">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                        <div>
+                            <p class="text-[9px] font-bold uppercase tracking-[0.14em] text-cocoa/45">KODE ANTREAN</p>
+                            <p id="display-payment-code" class="mt-0.5 font-display text-[14px] font-bold tracking-[0.08em] text-cocoa">
+                                PERKOCI
+                            </p>
+                        </div>
+                        <div style="text-align: right;">
+                            <p class="text-[9px] font-bold uppercase tracking-[0.14em] text-cocoa/45">TOTAL PEMBAYARAN</p>
+                            <p id="display-total-price" class="mt-0.5 font-display text-[18px] font-bold leading-tight text-brand">
+                                Rp 0
+                            </p>
+                        </div>
+                    </div>
+
+                    <p id="qris-instruction-text" class="mt-3 border-t border-cocoa/10 pt-3 text-[11px] leading-relaxed text-cocoa/65">
+                        Bukti transfermu sedang dicek oleh kasir. Pesanan diproses setelah pembayaran terverifikasi.
+                    </p>
+
+                    {{-- Form upload ulang jika belum upload / ditolak kasir --}}
+                    <div id="reupload-box" class="mt-3.5 hidden border-t border-cocoa/10 pt-3">
+                        <label for="reupload-input" class="block text-[11px] font-bold text-cocoa">
+                            Unggah Screenshot Bukti Transfer QRIS
+                        </label>
+                        <div class="mt-1.5 flex gap-2">
+                            <input id="reupload-input" type="file" accept="image/*"
+                                class="min-w-0 flex-1 text-[11px] text-cocoa file:mr-2 file:rounded-lg file:border-0 file:bg-brand file:px-2.5 file:py-1.5 file:text-[11px] file:font-bold file:text-white">
+                            <button id="reupload-btn" type="button"
+                                class="shrink-0 rounded-xl bg-brand px-3.5 py-2 text-[11px] font-bold text-white">
+                                Kirim
+                            </button>
+                        </div>
+                        <p id="reupload-msg" class="mt-1.5 hidden text-[11px] font-semibold text-danger"></p>
+                    </div>
+                </div>
+            </section>
+
             {{-- ===================== PROGRES SAJIAN (Timeline Jujur) =================== --}}
             <section class="card mt-3 p-5">
                 <div class="flex items-start justify-between gap-3">
@@ -86,10 +138,10 @@
                         </div>
                         <div class="min-w-0 flex-1 pt-2">
                             <div class="flex items-baseline justify-between gap-2">
-                                <p class="step-title text-[13px] font-bold leading-snug text-cocoa/40">Pesanan Diterima</p>
+                                <p id="step-menunggu-title" class="step-title text-[13px] font-bold leading-snug text-cocoa/40">Pesanan Diterima</p>
                                 <p id="time-created" class="shrink-0 text-[10px] font-semibold text-cocoa/35">-</p>
                             </div>
-                            <p class="mt-0.5 text-[11px] leading-relaxed text-cocoa/40">Pesanan tercatat dan diteruskan ke kasir/dapur.</p>
+                            <p id="step-menunggu-desc" class="mt-0.5 text-[11px] leading-relaxed text-cocoa/40">Pesanan tercatat dan diteruskan ke kasir/dapur.</p>
                         </div>
                     </li>
 
@@ -116,52 +168,13 @@
                         </div>
                         <div class="min-w-0 flex-1 pt-2">
                             <div class="flex items-baseline justify-between gap-2">
-                                <p id="step-final-title" class="step-title text-[13px] font-bold leading-snug text-cocoa/40">Selesai & Lunas</p>
+                                <p id="step-final-title" class="step-title text-[13px] font-bold leading-snug text-cocoa/40">Selesai &amp; Lunas</p>
                                 <p id="time-updated" class="shrink-0 text-[10px] font-semibold text-cocoa/35">-</p>
                             </div>
                             <p id="step-final-desc" class="mt-0.5 text-[11px] leading-relaxed text-cocoa/40">Pesanan telah disajikan dan selesai.</p>
                         </div>
                     </li>
                 </ol>
-            </section>
-
-            {{-- =================== METODE PEMBAYARAN ================== --}}
-            <section class="card mt-3 p-5">
-                <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0">
-                        <h2 class="font-display text-[16px] font-bold leading-tight text-cocoa">Pembayaran Non-Tunai</h2>
-                        <p class="mt-1 text-[12px] font-semibold text-cocoa/55">QRIS / Kasir</p>
-                    </div>
-
-                    <span id="payment-status-pill" class="pill shrink-0 bg-butter text-cocoa">
-                        <span class="ms text-[12px] leading-none">schedule</span>
-                        <span id="payment-status-text">Menunggu Pembayaran</span>
-                    </span>
-                </div>
-
-                <div class="mt-4 rounded-2xl bg-sand p-4">
-                    <div class="flex items-center gap-4">
-                        {{-- Pola QR --}}
-                        <div class="grid h-[96px] w-[96px] shrink-0 place-items-center rounded-xl bg-white p-1.5 shadow-soft">
-                            <svg viewBox="0 0 21 21" class="h-full w-full text-cocoa" shape-rendering="crispEdges" role="img">
-                                <path fill="currentColor" d="M0 0h7v7H0zM2 2v3h3V2zM14 0h7v7h-7zM16 2v3h3V2zM0 14h7v7H0zM2 16v3h3v-3zM9 0h3v3H9zM9 5h2v4H9zM4 9h5v2H4zM12 9h4v2h-4zM18 9h3v5h-3zM9 13h4v2H9zM15 13h2v4h-2zM9 17h3v4H9zM17 17h4v4h-4z"/>
-                            </svg>
-                        </div>
-
-                        <div class="min-w-0">
-                            <p class="text-[11px] leading-relaxed text-cocoa/55">Tunjukkan kode ini ke kasir jika membayar tunai/QRIS manual:</p>
-                            <p id="display-payment-code" class="mt-2 font-display text-[15px] font-bold tracking-[0.1em] text-cocoa">
-                                PERKOCI
-                            </p>
-                            <p class="mt-2.5 text-[9px] font-bold uppercase tracking-[0.14em] text-cocoa/40">
-                                TOTAL PEMBAYARAN
-                            </p>
-                            <p id="display-total-price" class="font-display text-[19px] font-bold leading-tight text-brand">
-                                Rp 0
-                            </p>
-                        </div>
-                    </div>
-                </div>
             </section>
 
             {{-- ==================== RINCIAN ITEM ====================== --}}
@@ -205,8 +218,6 @@
                 </div>
             </details>
 
-            
-
             <div data-action-feedback role="status" aria-live="polite" class="mt-2.5 hidden rounded-xl bg-brand/10 px-4 py-2.5 text-center text-[11px] font-semibold text-brand"></div>
 
             {{-- ====================== PENUTUP ========================= --}}
@@ -224,12 +235,10 @@
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            // Helper format Rupiah
             function formatRupiah(number) {
                 return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(number || 0);
             }
 
-            // Helper escape HTML (nama menu berasal dari database)
             function esc(str) {
                 return String(str == null ? '' : str)
                     .replace(/&/g, '&amp;')
@@ -238,7 +247,6 @@
                     .replace(/"/g, '&quot;');
             }
 
-            // Helper format jam (ISO -> "14:20 WIB")
             function formatJam(iso) {
                 if (!iso) return '-';
                 var d = new Date(iso);
@@ -248,7 +256,6 @@
                 }).replace('.', ':') + ' WIB';
             }
 
-            // Baca info order dari localStorage
             var lastOrder = window.PerkociOrder ? window.PerkociOrder.get() : null;
             if (!lastOrder) {
                 try {
@@ -257,7 +264,6 @@
                 } catch(e){}
             }
 
-            // Data tersimpan bisa memakai nama field berbeda (id/kode atau order_id/kode_akses)
             var orderId = lastOrder ? (lastOrder.id || lastOrder.order_id || lastOrder.id_pesanan) : null;
             var kodeAkses = lastOrder ? (lastOrder.kode || lastOrder.kode_akses) : null;
 
@@ -268,7 +274,6 @@
 
             document.getElementById('order-wrapper').classList.remove('hidden');
 
-            // Ubah response PesananResource ke bentuk yang dipakai updateView()
             function normalize(d) {
                 var namaMeja = 'Meja --';
                 if (d.meja) {
@@ -285,6 +290,8 @@
                     nomor_antrean: d.nomor_antrean || '---',
                     nama_pemesan: d.nama_pemesan || '-',
                     meja: namaMeja,
+                    metode_pembayaran: d.metode_pembayaran || 'tunai',
+                    status_pembayaran: d.status_pembayaran || 'belum_bayar',
                     status: d.status_pesanan === 'batal' ? 'dibatalkan' : d.status_pesanan,
                     created_at: formatJam(d.tanggal_pesan || d.created_at),
                     updated_at: formatJam(d.updated_at),
@@ -300,7 +307,6 @@
             }
 
             function updateView(data) {
-                // Info dasar
                 document.getElementById('display-location').textContent = data.meja;
                 document.getElementById('display-meja-detail').textContent = data.meja;
                 document.getElementById('display-antrean').textContent = data.nomor_antrean;
@@ -308,18 +314,15 @@
                 document.getElementById('display-order-id').textContent = data.id;
                 document.getElementById('display-payment-code').textContent = data.nomor_antrean !== '---' ? data.nomor_antrean : 'ORD-' + data.id;
 
-                // Waktu
                 document.getElementById('time-created').textContent = data.created_at || '-';
                 document.getElementById('time-updated').textContent = data.updated_at || '-';
 
-                // Total harga
                 var total = data.total || 0;
                 document.getElementById('display-total-price').textContent = formatRupiah(total);
                 document.getElementById('display-total-price-summary').textContent = formatRupiah(total);
                 document.getElementById('display-subtotal').textContent = formatRupiah(total);
                 document.getElementById('display-grand-total').textContent = formatRupiah(total);
 
-                // Rincian Item Menu
                 var items = data.items || [];
                 var itemCount = 0;
                 var itemListHtml = '';
@@ -351,6 +354,40 @@
                 document.getElementById('display-item-count').textContent = itemCount;
                 document.getElementById('display-item-list').innerHTML = itemListHtml;
 
+                // Kartu QRIS hanya tampil jika customer memilih metode QRIS
+                var qrisCard = document.getElementById('qris-payment-card');
+                var payPill = document.getElementById('payment-status-pill');
+                var payText = document.getElementById('payment-status-text');
+                var qrisInstr = document.getElementById('qris-instruction-text');
+                var reuploadBox = document.getElementById('reupload-box');
+
+                var isQris = data.metode_pembayaran === 'qris';
+                qrisCard.classList.toggle('hidden', !isQris);
+
+                if (isQris) {
+                    if (data.status_pembayaran === 'lunas' || data.status === 'selesai') {
+                        payPill.className = 'pill shrink-0 bg-lime text-cocoa';
+                        payText.textContent = 'Pembayaran Lunas ✓';
+                        qrisInstr.textContent = 'Pembayaran QRIS kamu telah dikonfirmasi lunas oleh kasir.';
+                        reuploadBox.classList.add('hidden');
+                    } else if (data.status_pembayaran === 'ditolak') {
+                        payPill.className = 'pill shrink-0 bg-red-100 text-red-700';
+                        payText.textContent = 'Bukti Ditolak';
+                        qrisInstr.textContent = 'Bukti transfer belum valid atau saldo belum masuk. Unggah ulang bukti pembayaran yang benar:';
+                        reuploadBox.classList.remove('hidden');
+                    } else if (data.status_pembayaran === 'belum_bayar') {
+                        payPill.className = 'pill shrink-0 bg-butter text-cocoa';
+                        payText.textContent = 'Belum Upload Bukti';
+                        qrisInstr.textContent = 'Scan QRIS di samping lalu unggah screenshot bukti pembayaran agar pesanan diproses:';
+                        reuploadBox.classList.remove('hidden');
+                    } else {
+                        payPill.className = 'pill shrink-0 bg-butter text-cocoa';
+                        payText.textContent = 'Menunggu Verifikasi Kasir';
+                        qrisInstr.textContent = 'Bukti transfermu sedang dicek kasir. Pesanan akan diproses setelah diverifikasi.';
+                        reuploadBox.classList.add('hidden');
+                    }
+                }
+
                 // Reset Class Timeline
                 var resetStep = function(id) {
                     var li = document.getElementById(id);
@@ -380,33 +417,33 @@
                 resetStep('step-diproses');
                 resetStep('step-final');
 
-                // Kembalikan teks langkah akhir ke bawaan (kalau sebelumnya dibatalkan)
                 document.getElementById('step-final-title').textContent = 'Selesai & Lunas';
                 document.getElementById('step-final-desc').textContent = 'Pesanan telah disajikan dan selesai.';
                 document.getElementById('final-step-ms-icon').textContent = 'task_alt';
 
                 var banner = document.getElementById('status-banner');
                 var statusText = document.getElementById('display-status-text');
-                var payPill = document.getElementById('payment-status-pill');
-                var payText = document.getElementById('payment-status-text');
 
-                // Pemetaan Status DB ke Timeline
                 if (data.status === 'menunggu') {
                     banner.className = 'mt-4 bg-brand px-5 py-4 text-center transition-colors';
-                    statusText.textContent = 'Pesanan Menunggu Konfirmasi';
+                    if (isQris && data.status_pembayaran !== 'lunas') {
+                        statusText.textContent = data.status_pembayaran === 'belum_bayar'
+                            ? 'Menunggu Bukti Pembayaran QRIS'
+                            : 'Menunggu Verifikasi Pembayaran Kasir';
+                        document.getElementById('step-menunggu-title').textContent = 'Verifikasi Pembayaran QRIS';
+                        document.getElementById('step-menunggu-desc').textContent = 'Pesanan akan diteruskan ke dapur setelah kasir mengonfirmasi pembayaran.';
+                    } else {
+                        statusText.textContent = 'Pesanan Menunggu Konfirmasi';
+                        document.getElementById('step-menunggu-title').textContent = 'Pesanan Diterima';
+                        document.getElementById('step-menunggu-desc').textContent = 'Pesanan tercatat dan diteruskan ke kasir/dapur.';
+                    }
                     activateStep('step-menunggu', false);
-
-                    payPill.className = 'pill shrink-0 bg-butter text-cocoa';
-                    payText.textContent = 'Belum Lunas';
                 }
                 else if (data.status === 'diproses') {
                     banner.className = 'mt-4 bg-brand px-5 py-4 text-center transition-colors';
                     statusText.textContent = 'Sedang Diracik oleh Barista / Dapur';
                     activateStep('step-menunggu', true);
                     activateStep('step-diproses', false);
-
-                    payPill.className = 'pill shrink-0 bg-butter text-cocoa';
-                    payText.textContent = 'Dalam Diproses';
                 }
                 else if (data.status === 'selesai') {
                     banner.className = 'mt-4 bg-brand px-5 py-4 text-center transition-colors';
@@ -414,9 +451,6 @@
                     activateStep('step-menunggu', true);
                     activateStep('step-diproses', true);
                     activateStep('step-final', true);
-
-                    payPill.className = 'pill shrink-0 bg-lime text-cocoa';
-                    payText.textContent = 'Selesai & Lunas';
                 }
                 else if (data.status === 'dibatalkan') {
                     banner.className = 'mt-4 bg-red-600 px-5 py-4 text-center transition-colors';
@@ -430,9 +464,6 @@
                     liFinal.classList.remove('opacity-40');
                     var iconFinal = liFinal.querySelector('.step-icon');
                     iconFinal.className = 'step-icon relative z-10 flex h-11 w-11 items-center justify-center rounded-full bg-red-600 text-white transition';
-
-                    payPill.className = 'pill shrink-0 bg-red-100 text-red-700';
-                    payText.textContent = 'Dibatalkan';
                 }
             }
 
@@ -458,11 +489,49 @@
                 });
             }
 
-            // Jalankan saat load & set polling 10s
+            // Handler upload ulang bukti bayar dari halaman /status
+            var reuploadBtn = document.getElementById('reupload-btn');
+            var reuploadInput = document.getElementById('reupload-input');
+            var reuploadMsg = document.getElementById('reupload-msg');
+
+            if (reuploadBtn && reuploadInput) {
+                reuploadBtn.addEventListener('click', function () {
+                    var file = reuploadInput.files && reuploadInput.files[0];
+                    if (!file) {
+                        reuploadMsg.textContent = 'Pilih file gambar bukti transfer dulu.';
+                        reuploadMsg.classList.remove('hidden');
+                        return;
+                    }
+
+                    var fd = new FormData();
+                    fd.append('bukti_bayar', file);
+                    reuploadBtn.disabled = true;
+                    reuploadBtn.textContent = 'Mengirim...';
+
+                    fetch('/api/pesanan/' + encodeURIComponent(orderId) + '/konfirmasi-qris?kode=' + encodeURIComponent(kodeAkses), {
+                        method: 'POST',
+                        headers: { 'Accept': 'application/json' },
+                        body: fd
+                    })
+                    .then(function (res) {
+                        if (!res.ok) throw new Error('Gagal mengunggah bukti.');
+                        reuploadMsg.classList.add('hidden');
+                        fetchStatus();
+                    })
+                    .catch(function (err) {
+                        reuploadMsg.textContent = err.message;
+                        reuploadMsg.classList.remove('hidden');
+                    })
+                    .finally(function () {
+                        reuploadBtn.disabled = false;
+                        reuploadBtn.textContent = 'Kirim';
+                    });
+                });
+            }
+
             fetchStatus();
             setInterval(fetchStatus, 10000);
 
-            // Handler tombol panggil pelayan & struk
             var buttons = document.querySelectorAll('[data-action]');
             var feedback = document.querySelector('[data-action-feedback]');
 

@@ -31,13 +31,20 @@
 
     <p data-flash class="hidden" role="status"></p>
 
-    {{-- Pilih periode --}}
-    <x-ui.section class="mt-5" title="Periode Laporan" description="Pilih rentang tanggal yang akan diexport. Maksimal 120 hari.">
+    {{-- Pilih periode & metode --}}
+    <x-ui.section class="mt-5" title="Periode Laporan" description="Pilih rentang tanggal dan metode pembayaran yang akan diexport. Maksimal 120 hari.">
         <div class="flex flex-wrap gap-2" data-presets>
             <button type="button" class="chip" data-preset="today" aria-pressed="false">Hari Ini</button>
             <button type="button" class="chip chip-active" data-preset="7" aria-pressed="true">7 Hari</button>
             <button type="button" class="chip" data-preset="30" aria-pressed="false">30 Hari</button>
             <button type="button" class="chip" data-preset="month" aria-pressed="false">Bulan Ini</button>
+        </div>
+
+        <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-cocoa/10 pt-3" data-methods>
+            <span class="mr-1 text-[11px] font-bold uppercase tracking-[0.08em] text-cocoa/45">Metode:</span>
+            <button type="button" class="chip chip-active" data-method="all" aria-pressed="true">Semua</button>
+            <button type="button" class="chip" data-method="tunai" aria-pressed="false">Tunai</button>
+            <button type="button" class="chip" data-method="qris" aria-pressed="false">QRIS</button>
         </div>
 
         <div class="mt-3 flex flex-wrap items-end gap-3">
@@ -124,6 +131,7 @@
             var startInput = document.querySelector('[data-start]');
             var endInput = document.querySelector('[data-end]');
             var presetButtons = Array.prototype.slice.call(document.querySelectorAll('[data-preset]'));
+            var methodButtons = Array.prototype.slice.call(document.querySelectorAll('[data-method]'));
             var delimiterEl = document.querySelector('[data-delimiter]');
             var recapBody = document.querySelector('[data-recap-table] tbody');
             var detailBody = document.querySelector('[data-detail-table] tbody');
@@ -131,13 +139,26 @@
             var previewCount = document.querySelector('[data-preview-count]');
             var previewTotal = document.querySelector('[data-preview-total]');
             var exportButtons = Array.prototype.slice.call(document.querySelectorAll('[data-export]'));
+            var METHOD_LABEL = { all: 'Semua Metode', tunai: 'Tunai', qris: 'QRIS' };
 
             var current = null; // { start, end, orders, days, revenue }
+            var rawData = null; // { start, end, orders, totalRevenue }
+            var selectedMethod = 'all';
             var busy = false;
 
             function markPreset(name) {
                 presetButtons.forEach(function (button) {
                     var active = button.getAttribute('data-preset') === name;
+
+                    button.classList.toggle('chip-active', active);
+                    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+                });
+            }
+
+            function markMethod(method) {
+                selectedMethod = method;
+                methodButtons.forEach(function (button) {
+                    var active = button.getAttribute('data-method') === method;
 
                     button.classList.toggle('chip-active', active);
                     button.setAttribute('aria-pressed', active ? 'true' : 'false');
@@ -175,14 +196,14 @@
 
                 if (current.orders.length === 0) {
                     var empty = document.createElement('tr');
-                    var cell = Manager.make('td', 'px-4 py-6 text-center text-sm text-cocoa/45', 'Tidak ada pesanan yang dibayar pada periode ini.');
+                    var cell = Manager.make('td', 'px-4 py-6 text-center text-sm text-cocoa/45', 'Tidak ada pesanan yang dibayar untuk filter ini.');
                     cell.colSpan = 6;
                     empty.appendChild(cell);
                     detailBody.appendChild(empty);
                 }
 
                 current.orders.forEach(function (order) {
-                    detailBody.appendChild(row(
+                    var tr = row(
                         [
                             order.nomor_antrean,
                             dateText(order.tanggal_pesan) + ' ' + Manager.timeLabel(order.tanggal_pesan),
@@ -193,12 +214,51 @@
                         ],
                         ['font-semibold text-cocoa', 'whitespace-nowrap', 'whitespace-nowrap', 'min-w-[180px] text-cocoa/70',
                             'whitespace-nowrap font-semibold text-cocoa', 'whitespace-nowrap']
-                    ));
+                    );
+
+                    if (order.bukti_bayar_url) {
+                        var proofLink = Manager.make('a',
+                            'ml-2 inline-block rounded-lg border border-brand/30 bg-brand/[0.06] px-2 py-0.5 text-[10.5px] font-bold text-brand hover:bg-brand/15',
+                            'Bukti QRIS');
+                        proofLink.href = order.bukti_bayar_url;
+                        proofLink.target = '_blank';
+                        proofLink.rel = 'noopener';
+                        tr.lastChild.appendChild(proofLink);
+                    }
+
+                    detailBody.appendChild(tr);
                 });
 
-                previewPeriod.textContent = Manager.longDay(current.start) + ' – ' + Manager.longDay(current.end);
+                previewPeriod.textContent = Manager.longDay(current.start) + ' – ' + Manager.longDay(current.end) + ' (' + METHOD_LABEL[selectedMethod] + ')';
                 previewCount.textContent = current.orders.length;
                 previewTotal.textContent = Manager.rupiah(current.revenue);
+            }
+
+            function applyFilter() {
+                if (!rawData) {
+                    return;
+                }
+
+                var filteredOrders = rawData.orders.filter(function (order) {
+                    if (selectedMethod === 'all') {
+                        return true;
+                    }
+                    return Manager.methodName(order).toLowerCase().indexOf(selectedMethod) !== -1;
+                });
+
+                var revenue = selectedMethod === 'all'
+                    ? rawData.totalRevenue
+                    : filteredOrders.reduce(function (sum, order) { return sum + (Number(order.total_harga) || 0); }, 0);
+
+                current = {
+                    start: rawData.start,
+                    end: rawData.end,
+                    orders: filteredOrders,
+                    days: Manager.groupByDay(filteredOrders, rawData.start, rawData.end),
+                    revenue: revenue
+                };
+
+                render();
             }
 
             function load(start, end) {
@@ -223,15 +283,14 @@
                             return a.id_pesanan - b.id_pesanan;
                         });
 
-                        current = {
+                        rawData = {
                             start: start,
                             end: end,
                             orders: orders,
-                            days: Manager.groupByDay(orders, start, end),
-                            revenue: Number(sales.total_pendapatan) || 0
+                            totalRevenue: Number(sales.total_pendapatan) || 0
                         };
 
-                        render();
+                        applyFilter();
                     })
                     .catch(function (error) {
                         Manager.flash(flashEl, 'error', 'Gagal memuat laporan: ' + error.message);
@@ -251,6 +310,7 @@
             }
 
             function exportDetail() {
+                var suffix = selectedMethod === 'all' ? '' : '_' + selectedMethod;
                 var rows = [['Nomor Antrean', 'Tanggal', 'Jam', 'Meja', 'Menu', 'Jumlah Item', 'Total', 'Metode', 'Dibayar', 'Kembalian']];
 
                 current.orders.forEach(function (order) {
@@ -270,11 +330,12 @@
                     ]);
                 });
 
-                Manager.downloadCsv('transaksi_' + current.start + '_sd_' + current.end + '.csv', rows, delimiterEl.value);
+                Manager.downloadCsv('transaksi' + suffix + '_' + current.start + '_sd_' + current.end + '.csv', rows, delimiterEl.value);
             }
 
             function exportRecap() {
-                var rows = [['Tanggal', 'Jumlah Pesanan', 'Penjualan']];
+                var suffix = selectedMethod === 'all' ? '' : '_' + selectedMethod;
+                var rows = [['Tanggal', 'Jumlah Pesanan', 'Penjualan (' + METHOD_LABEL[selectedMethod] + ')']];
 
                 current.days.forEach(function (day) {
                     rows.push([day.date, day.orders, day.revenue]);
@@ -282,7 +343,7 @@
 
                 rows.push(['Total', current.orders.length, current.revenue]);
 
-                Manager.downloadCsv('rekap_harian_' + current.start + '_sd_' + current.end + '.csv', rows, delimiterEl.value);
+                Manager.downloadCsv('rekap_harian' + suffix + '_' + current.start + '_sd_' + current.end + '.csv', rows, delimiterEl.value);
             }
 
             exportButtons.forEach(function (button) {
@@ -311,6 +372,13 @@
                 });
             });
 
+            methodButtons.forEach(function (button) {
+                button.addEventListener('click', function () {
+                    markMethod(button.getAttribute('data-method'));
+                    applyFilter();
+                });
+            });
+
             document.querySelector('[data-apply]').addEventListener('click', function () {
                 markPreset('');
                 load(startInput.value, endInput.value);
@@ -320,3 +388,4 @@
         });
     </script>
 @endpush
+```[cite: 9]

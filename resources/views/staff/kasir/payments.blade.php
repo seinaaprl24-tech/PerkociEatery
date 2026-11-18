@@ -63,10 +63,10 @@
             text-align: right;
         }
 
-        /* Ubin metode pembayaran */
+        /* Ubin metode pembayaran (2 kolom: Tunai & QRIS) */
         .pay-tiles {
             display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 12px;
             margin-top: 10px;
         }
@@ -167,7 +167,6 @@
         $methods = [
             ['value' => 'tunai', 'label' => 'Tunai', 'meta' => 'Uang tunai di kasir', 'icon' => 'payments'],
             ['value' => 'qris', 'label' => 'QRIS', 'meta' => 'Scan kode QRIS', 'icon' => 'qr_code_2'],
-            ['value' => 'e-wallet', 'label' => 'E-Wallet', 'meta' => 'Transfer / dompet digital', 'icon' => 'account_balance_wallet'],
         ];
     @endphp
 
@@ -215,9 +214,34 @@
                 </div>
             </div>
 
+            {{-- Panel khusus pesanan QRIS: tampilkan bukti transfer customer --}}
+            <div data-qris-verify-box class="hidden rounded-2xl border border-brand/25 bg-brand/[0.05] p-4" style="margin-top: 20px">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <p class="text-[11px] font-bold uppercase tracking-[0.14em] text-brand">Bukti Pembayaran QRIS Customer</p>
+                        <p class="mt-0.5 text-[12px] text-cocoa/70">Cek mutasi masuk di DANA Bisnis &amp; bukti transfer di bawah ini:</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <a data-qris-proof-link href="#" target="_blank" rel="noopener"
+                            class="shrink-0 rounded-xl border border-cocoa/15 bg-white px-3 py-1.5 text-[11px] font-bold text-cocoa hover:bg-sand">
+                            Perbesar Bukti
+                        </a>
+                        <button type="button" data-qris-reject
+                            class="shrink-0 rounded-xl border border-danger/30 bg-white px-3 py-1.5 text-[11px] font-bold text-danger hover:bg-danger/10">
+                            Tolak Bukti
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mt-3 flex justify-center rounded-xl border border-cocoa/10 bg-white p-2">
+                    <img data-qris-proof-img src="" alt="Bukti Transfer QRIS Customer"
+                        style="max-height: 260px; width: auto; object-fit: contain; border-radius: 8px;">
+                </div>
+            </div>
+
             <form data-pay-form id="pay-form" class="pay-stack hidden" style="margin-top: 24px" novalidate>
-                {{-- 5. Metode pembayaran --}}
-                <div data-pay-controls>
+                {{-- 5. Metode pembayaran (disembunyikan otomatis bila pesanan sudah bertipe QRIS) --}}
+                <div data-pay-controls data-method-picker>
                     <p class="text-[11px] font-bold uppercase tracking-[0.16em] text-cocoa/50">Metode Pembayaran</p>
 
                     <div class="pay-tiles">
@@ -234,8 +258,8 @@
                     </div>
                 </div>
 
-                {{-- 6. Uang diterima + kembalian (Total sudah ada di kotak cokelat di atas) --}}
-                <div class="pay-money">
+                {{-- 6. Uang diterima + kembalian (disembunyikan otomatis bila pesanan QRIS) --}}
+                <div class="pay-money" data-money-box>
                     <div data-stat="cash" class="pay-box bg-sand">
                         <label for="pay-cash" class="pay-box-label text-cocoa/50">Uang Diterima</label>
                         {{-- Target pengisian script (.font-display); nilai yang tampil ada di input di bawahnya. --}}
@@ -410,11 +434,17 @@
                 return document.querySelector(selector);
             }
 
-            var METHOD_LABEL = { 'tunai': 'Tunai', 'qris': 'QRIS', 'e-wallet': 'E-Wallet' };
+            var METHOD_LABEL = { 'tunai': 'Tunai', 'qris': 'QRIS' };
 
             var flashEl = q('[data-flash]');
             var form = q('[data-pay-form]');
             var payControls = document.querySelectorAll('[data-pay-controls]');
+            var methodPicker = q('[data-method-picker]');
+            var moneyBox = q('[data-money-box]');
+            var qrisVerifyBox = q('[data-qris-verify-box]');
+            var qrisProofImg = q('[data-qris-proof-img]');
+            var qrisProofLink = q('[data-qris-proof-link]');
+            var qrisRejectBtn = q('[data-qris-reject]');
             var cashInput = q('[data-pay-cash]');
             var quickEl = q('[data-quick-cash]');
             var submitBtn = q('[data-pay-submit]');
@@ -465,6 +495,23 @@
                 var checked = form.querySelector('input[name="metode"]:checked');
 
                 return checked ? checked.value : 'tunai';
+            }
+
+            function setMethodRadio(val) {
+                var target = val === 'qris' ? 'qris' : 'tunai';
+                var radio = form.querySelector('input[name="metode"][value="' + target + '"]');
+
+                if (radio) {
+                    radio.checked = true;
+                }
+            }
+
+            function isQrisOrder(order) {
+                return order && String(order.metode_pembayaran || '').toLowerCase() === 'qris';
+            }
+
+            function isQrisClaimed(order) {
+                return isQrisOrder(order) && String(order.status_pembayaran || '').toLowerCase() === 'menunggu_verifikasi';
             }
 
             function totalOf(order) {
@@ -745,12 +792,15 @@
             function renderSummary() {
                 var order = paid ? paid.order : selected;
                 var showControls = !!selected && !paid;
+                var isQris = !!(order && isQrisOrder(order));
 
                 summaryEmpty.classList.toggle('hidden', !!order);
                 summaryEl.classList.toggle('hidden', !order);
 
                 if (order) {
                     var customer = Kasir.customer(order);
+                    var qrisClaimed = isQrisClaimed(order);
+                    var payStatus = String(order.status_pembayaran || '').toLowerCase();
 
                     q('[data-sum-number]').textContent = order.nomor_antrean;
                     q('[data-sum-table]').textContent = Kasir.tableLabel(order);
@@ -759,21 +809,54 @@
                     sumSubtotal.textContent = Kasir.rupiah(subtotalOf(order));
                     renderSummaryLines(order);
 
-                    sumStatus.textContent = paid ? 'Lunas' : 'Menunggu Pembayaran';
-                    sumStatus.className = paid
-                        ? 'badge badge-lime shrink-0 whitespace-nowrap'
-                        : 'badge badge-butter shrink-0 whitespace-nowrap';
+                    if (paid) {
+                        sumStatus.textContent = 'Lunas';
+                        sumStatus.className = 'badge badge-lime shrink-0 whitespace-nowrap';
+                    } else if (qrisClaimed) {
+                        sumStatus.textContent = 'QRIS · Siap Konfirmasi Lunas';
+                        sumStatus.className = 'badge badge-lime shrink-0 whitespace-nowrap';
+                    } else if (payStatus === 'ditolak') {
+                        sumStatus.textContent = 'Bukti QRIS Ditolak (Menunggu Upload Ulang)';
+                        sumStatus.className = 'badge badge-butter shrink-0 whitespace-nowrap';
+                    } else if (isQris) {
+                        sumStatus.textContent = 'Pembayaran QRIS';
+                        sumStatus.className = 'badge badge-butter shrink-0 whitespace-nowrap';
+                    } else {
+                        sumStatus.textContent = 'Menunggu Pembayaran Tunai';
+                        sumStatus.className = 'badge badge-butter shrink-0 whitespace-nowrap';
+                    }
+
+                    submitBtn.textContent = isQris
+                        ? 'Konfirmasi Pembayaran QRIS (Lunas)'
+                        : 'Konfirmasi Pembayaran';
                 }
 
-                /* Kotak Uang/Kembalian tetap tampil setelah dibayar; hanya kontrol input yang disembunyikan. */
-                form.classList.toggle('hidden', !selected);
+                if (qrisVerifyBox) {
+                    var hasProof = isQris && !paid && !!(order && order.bukti_bayar_url);
+                    qrisVerifyBox.style.display = hasProof ? 'block' : 'none';
+
+                    if (hasProof) {
+                        qrisProofImg.src = order.bukti_bayar_url;
+                        qrisProofLink.href = order.bukti_bayar_url;
+                    }
+                }
+
+                form.style.display = selected ? 'block' : 'none';
 
                 Array.prototype.forEach.call(payControls, function (node) {
-                    node.classList.toggle('hidden', !showControls);
+                    node.style.display = showControls ? '' : 'none';
                 });
 
-                afterPay.classList.toggle('hidden', !paid);
-                afterPay.classList.toggle('flex', !!paid);
+                /* Untuk pesanan QRIS: hilangkan kotak pilihan metode & input uang tunai — kasir tinggal 1 klik konfirmasi */
+                if (methodPicker && isQris) {
+                    methodPicker.style.display = 'none';
+                }
+
+                if (moneyBox) {
+                    moneyBox.style.display = isQris ? 'none' : '';
+                }
+
+                afterPay.style.display = paid ? 'flex' : 'none';
 
                 printBtn.disabled = !paid;
             }
@@ -785,6 +868,10 @@
 
                 active.forEach(function (order) {
                     var isSelected = selected && !paid && selected.id_pesanan === order.id_pesanan;
+                    var qrisTag = isQrisClaimed(order)
+                        ? ' · QRIS (Bukti Terkirim)'
+                        : (isQrisOrder(order) ? ' · QRIS' : '');
+
                     var item = Kasir.make('li');
                     var pick = Kasir.make('button',
                         'flex w-full items-center justify-between gap-3 rounded-xl border px-3.5 py-3 text-left transition '
@@ -794,7 +881,7 @@
                     var left = Kasir.make('div', 'min-w-0');
                     left.appendChild(Kasir.make('p', 'text-xs font-bold text-cocoa',
                         order.nomor_antrean + ' · ' + Kasir.tableLabel(order)
-                        + (Kasir.customer(order) ? ' · ' + Kasir.customer(order) : '')));
+                        + (Kasir.customer(order) ? ' · ' + Kasir.customer(order) : '') + qrisTag));
                     left.appendChild(Kasir.make('p', 'mt-0.5 text-[11px] text-cocoa/45',
                         Kasir.itemCount(order) + ' item · ' + Kasir.ago(order.tanggal_pesan)));
                     pick.appendChild(left);
@@ -825,11 +912,24 @@
                         (payment.metode_pembayaran || '-') + ' · ' + Kasir.ago(payment.tanggal_pembayaran)));
                     item.appendChild(left);
 
+                    var right = Kasir.make('div', 'flex shrink-0 items-center gap-2.5');
+
+                    if (order.bukti_bayar_url) {
+                        var proofLink = Kasir.make('a',
+                            'rounded-lg border border-brand/30 bg-brand/[0.06] px-2.5 py-1 text-[10.5px] font-bold text-brand hover:bg-brand/15',
+                            'Lihat Bukti');
+                        proofLink.href = order.bukti_bayar_url;
+                        proofLink.target = '_blank';
+                        proofLink.rel = 'noopener';
+                        right.appendChild(proofLink);
+                    }
+
                     var total = order.total_harga !== undefined
                         ? order.total_harga
                         : (Number(payment.jumlah_bayar) || 0) - (Number(payment.kembalian) || 0);
-                    item.appendChild(Kasir.make('p', 'shrink-0 font-display text-sm font-bold text-cocoa', Kasir.rupiah(total)));
+                    right.appendChild(Kasir.make('p', 'font-display text-sm font-bold text-cocoa', Kasir.rupiah(total)));
 
+                    item.appendChild(right);
                     historyEl.appendChild(item);
                 });
 
@@ -852,7 +952,11 @@
 
                 paid = null;
                 selected = order;
-                cashInput.value = method() === 'tunai' ? '' : totalOf(order);
+
+                var targetMethod = isQrisOrder(order) ? 'qris' : 'tunai';
+                setMethodRadio(targetMethod);
+                cashInput.value = targetMethod === 'tunai' ? '' : totalOf(order);
+
                 Kasir.hideFlash(flashEl);
                 renderAll();
             }
@@ -887,10 +991,18 @@
 
                 if (currentId !== selectedId) {
                     selected = current;
-                    cashInput.value = selected && method() !== 'tunai' ? totalOf(selected) : '';
+
+                    var targetMethod = isQrisOrder(selected) ? 'qris' : 'tunai';
+                    setMethodRadio(targetMethod);
+                    cashInput.value = selected && targetMethod !== 'tunai' ? totalOf(selected) : '';
                 } else if (current) {
-                    /* pesanan sama: perbarui datanya, biarkan isian uang apa adanya */
+                    var wasQris = isQrisOrder(selected);
                     selected = current;
+
+                    if (!wasQris && isQrisOrder(selected)) {
+                        setMethodRadio('qris');
+                        cashInput.value = totalOf(selected);
+                    }
                 }
             }
 
@@ -913,8 +1025,34 @@
                     });
             }
 
+            if (qrisRejectBtn) {
+                qrisRejectBtn.addEventListener('click', function () {
+                    if (busy || !selected || paid) {
+                        return;
+                    }
+
+                    busy = true;
+                    qrisRejectBtn.disabled = true;
+
+                    StaffApi.request('POST', '/pesanan/' + selected.id_pesanan + '/tolak-qris')
+                        .then(function () {
+                            Kasir.flash(flashEl, 'success', 'Bukti QRIS ditolak. Pelanggan diminta mengunggah ulang bukti transfer.');
+                            return refresh();
+                        })
+                        .catch(function (error) {
+                            Kasir.flash(flashEl, 'error', error.message);
+                        })
+                        .then(function () {
+                            busy = false;
+                            qrisRejectBtn.disabled = false;
+                            renderAll();
+                        });
+                });
+            }
+
             form.addEventListener('change', function () {
                 syncMethod();
+                renderSummary();
                 renderQuick();
                 renderReceipt();
                 renderMoney();
@@ -932,8 +1070,10 @@
                     return;
                 }
 
+                var isQris = isQrisOrder(selected);
                 var total = totalOf(selected);
-                var received = cash();
+                var received = isQris ? total : cash();
+                var activeMethod = isQris ? 'qris' : method();
 
                 Kasir.hideFlash(flashEl);
 
@@ -949,7 +1089,7 @@
                 StaffApi.request('POST', '/pembayaran', {
                     pesanan_id: selected.id_pesanan,
                     jumlah_bayar: received,
-                    metode_pembayaran: method()
+                    metode_pembayaran: activeMethod
                 })
                     .then(function (response) {
                         var data = response.data || {};
@@ -958,12 +1098,14 @@
                             order: selected,
                             cash: Number(data.jumlah_bayar) || received,
                             change: data.kembalian !== undefined ? Number(data.kembalian) : received - total,
-                            method: data.metode_pembayaran || METHOD_LABEL[method()]
+                            method: data.metode_pembayaran || METHOD_LABEL[activeMethod]
                         };
 
                         cashInput.value = paid.cash;
 
-                        Kasir.flash(flashEl, 'success', 'Pembayaran berhasil. Kembalian ' + Kasir.rupiah(paid.change) + '.');
+                        Kasir.flash(flashEl, 'success', isQris
+                            ? 'Pembayaran QRIS berhasil dikonfirmasi lunas.'
+                            : 'Pembayaran berhasil. Kembalian ' + Kasir.rupiah(paid.change) + '.');
 
                         return refresh();
                     })

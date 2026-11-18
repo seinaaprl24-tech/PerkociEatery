@@ -22,13 +22,20 @@
 
     <p data-flash class="hidden" role="status"></p>
 
-    {{-- Pilih periode --}}
-    <x-ui.section class="mt-5" title="Periode Laporan" description="Pilih rentang tanggal. Maksimal 120 hari.">
+    {{-- Pilih periode & metode --}}
+    <x-ui.section class="mt-5" title="Periode Laporan" description="Pilih rentang tanggal dan metode pembayaran. Maksimal 120 hari.">
         <div class="flex flex-wrap gap-2" data-presets>
             <button type="button" class="chip" data-preset="today" aria-pressed="false">Hari Ini</button>
             <button type="button" class="chip chip-active" data-preset="7" aria-pressed="true">7 Hari</button>
             <button type="button" class="chip" data-preset="30" aria-pressed="false">30 Hari</button>
             <button type="button" class="chip" data-preset="month" aria-pressed="false">Bulan Ini</button>
+        </div>
+
+        <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-cocoa/10 pt-3" data-methods>
+            <span class="mr-1 text-[11px] font-bold uppercase tracking-[0.08em] text-cocoa/45">Metode:</span>
+            <button type="button" class="chip chip-active" data-method="all" aria-pressed="true">Semua</button>
+            <button type="button" class="chip" data-method="tunai" aria-pressed="false">Tunai</button>
+            <button type="button" class="chip" data-method="qris" aria-pressed="false">QRIS</button>
         </div>
 
         <div class="mt-3 flex flex-wrap items-end gap-3">
@@ -94,6 +101,7 @@
             var startInput = document.querySelector('[data-start]');
             var endInput = document.querySelector('[data-end]');
             var presetButtons = Array.prototype.slice.call(document.querySelectorAll('[data-preset]'));
+            var methodButtons = Array.prototype.slice.call(document.querySelectorAll('[data-method]'));
             var periodLabel = document.querySelector('[data-period-label]');
             var barsEl = document.querySelector('[data-bars]');
             var chartTotal = document.querySelector('[data-chart-total]');
@@ -101,11 +109,26 @@
             var topEmpty = document.querySelector('[data-top-empty]');
             var recapBody = document.querySelector('[data-recap-table] tbody');
             var PRESET_LABEL = { today: 'Hari Ini', '7': '7 Hari', '30': '30 Hari', month: 'Bulan Ini' };
+            var METHOD_LABEL = { all: '', tunai: ' · Tunai', qris: ' · QRIS' };
+
             var busy = false;
+            var selectedMethod = 'all';
+            var lastSales = null;
+            var currentRange = { start: '', end: '', label: '7 Hari' };
 
             function markPreset(name) {
                 presetButtons.forEach(function (button) {
                     var active = button.getAttribute('data-preset') === name;
+
+                    button.classList.toggle('chip-active', active);
+                    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+                });
+            }
+
+            function markMethod(method) {
+                selectedMethod = method;
+                methodButtons.forEach(function (button) {
+                    var active = button.getAttribute('data-method') === method;
 
                     button.classList.toggle('chip-active', active);
                     button.setAttribute('aria-pressed', active ? 'true' : 'false');
@@ -161,6 +184,42 @@
                 recapBody.appendChild(total);
             }
 
+            function renderFiltered() {
+                if (!lastSales) {
+                    return;
+                }
+
+                periodLabel.textContent = currentRange.label + (METHOD_LABEL[selectedMethod] || '');
+
+                var allOrders = lastSales.data || [];
+                var filteredOrders = allOrders.filter(function (order) {
+                    if (selectedMethod === 'all') {
+                        return true;
+                    }
+                    return Manager.methodName(order).toLowerCase().indexOf(selectedMethod) !== -1;
+                });
+
+                var transactions = selectedMethod === 'all'
+                    ? (Number(lastSales.total_transaksi) || filteredOrders.length)
+                    : filteredOrders.length;
+
+                var revenue = selectedMethod === 'all'
+                    ? (Number(lastSales.total_pendapatan) || 0)
+                    : filteredOrders.reduce(function (sum, order) { return sum + (Number(order.total_harga) || 0); }, 0);
+
+                var days = Manager.groupByDay(filteredOrders, currentRange.start, currentRange.end);
+
+                Manager.setStat('revenue', Manager.rupiah(revenue));
+                Manager.setStat('orders', transactions);
+                Manager.setStat('average', Manager.rupiah(transactions > 0 ? Math.round(revenue / transactions) : 0));
+                Manager.setStat('sold', Manager.totalSold(filteredOrders));
+
+                chartTotal.textContent = Manager.rupiah(revenue);
+                Manager.renderBars(barsEl, days);
+                renderTop(filteredOrders);
+                renderRecap(days, transactions, revenue);
+            }
+
             function load(start, end, label) {
                 var problem = Manager.validRange(start, end);
 
@@ -176,24 +235,13 @@
 
                 busy = true;
                 Manager.hideFlash(flashEl);
-                periodLabel.textContent = label;
+                currentRange = { start: start, end: end, label: label };
+                periodLabel.textContent = label + (METHOD_LABEL[selectedMethod] || '');
 
                 Manager.loadSales(start, end)
                     .then(function (sales) {
-                        var orders = sales.data || [];
-                        var transactions = Number(sales.total_transaksi) || 0;
-                        var revenue = Number(sales.total_pendapatan) || 0;
-                        var days = Manager.groupByDay(orders, start, end);
-
-                        Manager.setStat('revenue', Manager.rupiah(revenue));
-                        Manager.setStat('orders', transactions);
-                        Manager.setStat('average', Manager.rupiah(transactions > 0 ? Math.round(revenue / transactions) : 0));
-                        Manager.setStat('sold', Manager.totalSold(orders));
-
-                        chartTotal.textContent = Manager.rupiah(revenue);
-                        Manager.renderBars(barsEl, days);
-                        renderTop(orders);
-                        renderRecap(days, transactions, revenue);
+                        lastSales = sales;
+                        renderFiltered();
                     })
                     .catch(function (error) {
                         Manager.flash(flashEl, 'error', 'Gagal memuat laporan: ' + error.message);
@@ -215,6 +263,13 @@
             presetButtons.forEach(function (button) {
                 button.addEventListener('click', function () {
                     usePreset(button.getAttribute('data-preset'));
+                });
+            });
+
+            methodButtons.forEach(function (button) {
+                button.addEventListener('click', function () {
+                    markMethod(button.getAttribute('data-method'));
+                    renderFiltered();
                 });
             });
 

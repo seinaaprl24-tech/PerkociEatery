@@ -158,6 +158,60 @@
         </button>
     </div>
 
+    {{-- ==================== MODAL PEMBAYARAN QRIS ==================== --}}
+    <div data-qris-modal class="hidden backdrop-blur-xs" role="dialog" aria-modal="true" aria-labelledby="qris-modal-title">
+        <div class="qris-dialog">
+            <div class="flex items-center justify-between gap-2 border-b border-cocoa/10 pb-3">
+                <div>
+                    <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-olive">Pembayaran QRIS</p>
+                    <h2 id="qris-modal-title" class="font-display text-[18px] font-bold text-cocoa">Scan QRIS Perkoci Eatery</h2>
+                </div>
+                <span class="pill-sm bg-lime text-cocoa" data-qris-queue>-</span>
+            </div>
+
+            {{-- Nominal Tagihan --}}
+            <div class="mt-3 flex items-center justify-between gap-2 rounded-2xl bg-sand px-4 py-2.5">
+                <div>
+                    <p class="text-[10.5px] font-semibold text-cocoa/55">Total yang harus dibayar</p>
+                    <p class="font-display text-[20px] font-bold leading-tight text-brand" data-qris-amount>Rp 0</p>
+                </div>
+                <button type="button" data-qris-copy
+                    class="rounded-xl border border-cocoa/15 bg-white px-3 py-2 text-[11px] font-bold text-cocoa transition hover:bg-cocoa/5 active:scale-95">
+                    Salin Nominal
+                </button>
+            </div>
+
+            {{-- Gambar QRIS DANA Bisnis --}}
+            <div class="mt-3 flex flex-col items-center rounded-2xl border border-cocoa/10 bg-white p-2.5">
+                <img src="{{ asset('images/qris-perkoci.jpeg') }}" alt="QRIS DANA Bisnis Perkoci Eatery">
+                <p class="mt-1.5 text-center text-[10.5px] font-semibold text-cocoa/70">
+                    Scan lewat DANA, GoPay, OVO, ShopeePay, atau Mobile Banking
+                </p>
+            </div>
+
+            {{-- Upload Bukti Pembayaran (WAJIB) --}}
+            <div class="mt-3 rounded-2xl border border-dashed border-brand/40 bg-brand/[0.04] p-3">
+                <label for="qris-proof-input" class="block text-[11.5px] font-bold text-cocoa">
+                    Unggah Screenshot Bukti Transfer <span class="text-danger">*</span>
+                </label>
+                <p class="mt-0.5 text-[10px] text-cocoa/60">
+                    Pesanan baru akan diproses kasir &amp; dapur setelah bukti bayar diunggah.
+                </p>
+
+                <input id="qris-proof-input" data-qris-file type="file" accept="image/*"
+                    class="mt-2 block w-full text-[11px] text-cocoa file:mr-3 file:rounded-xl file:border-0 file:bg-brand file:px-3 py-2 file:text-[11px] file:font-bold file:text-white">
+
+                <p data-qris-error class="mt-1.5 hidden text-[11px] font-semibold text-danger"></p>
+            </div>
+
+            <button type="button" data-qris-confirm disabled
+                class="btn-primary mt-3.5 flex w-full items-center justify-center gap-2 py-3.5 text-[13px] disabled:cursor-not-allowed disabled:opacity-45">
+                <span class="ms text-[18px] leading-none">upload_file</span>
+                Kirim Bukti Pembayaran
+            </button>
+        </div>
+    </div>
+
     {{-- Template kartu item --}}
     <template data-cart-card>
         <article class="card p-3" data-cart-item>
@@ -237,11 +291,27 @@
             var errorEl = document.querySelector('[data-submit-error]');
             var successEl = document.querySelector('[data-success]');
 
+            var qrisModal = document.querySelector('[data-qris-modal]');
+            var qrisQueue = document.querySelector('[data-qris-queue]');
+            var qrisAmount = document.querySelector('[data-qris-amount]');
+            var qrisCopyBtn = document.querySelector('[data-qris-copy]');
+            var qrisFileInput = document.querySelector('[data-qris-file]');
+            var qrisConfirmBtn = document.querySelector('[data-qris-confirm]');
+            var qrisErrorEl = document.querySelector('[data-qris-error]');
+
+            var rawQrisNominal = 0;
+            var currentQrisOrder = null;
             var sent = false;
             var busy = false;
 
             function rupiah(value) {
                 return 'Rp ' + value.toLocaleString('id-ID');
+            }
+
+            function selectedPaymentMethod() {
+                var checked = document.querySelector('input[name="payment_method"]:checked');
+
+                return checked ? checked.value : 'tunai';
             }
 
             /* Gabungkan isi keranjang browser dengan data menu terbaru dari server. */
@@ -383,6 +453,97 @@
                 submitTotalEl.classList.toggle('hidden', state);
             }
 
+            function openQrisModal(order, fallbackTotal) {
+                currentQrisOrder = order;
+                rawQrisNominal = Number(order.total_harga) || fallbackTotal || 0;
+                qrisQueue.textContent = order.nomor_antrean || '-';
+                qrisAmount.textContent = rupiah(rawQrisNominal);
+
+                if (qrisFileInput) {
+                    qrisFileInput.value = '';
+                }
+                if (qrisConfirmBtn) {
+                    qrisConfirmBtn.disabled = true;
+                }
+                if (qrisErrorEl) {
+                    qrisErrorEl.classList.add('hidden');
+                    qrisErrorEl.textContent = '';
+                }
+
+                qrisModal.classList.remove('hidden');
+                qrisModal.classList.add('flex');
+            }
+
+            if (qrisCopyBtn) {
+                qrisCopyBtn.addEventListener('click', function () {
+                    if (!navigator.clipboard) {
+                        return;
+                    }
+
+                    navigator.clipboard.writeText(String(rawQrisNominal)).then(function () {
+                        qrisCopyBtn.textContent = 'Tersalin ✓';
+                        setTimeout(function () {
+                            qrisCopyBtn.textContent = 'Salin Nominal';
+                        }, 2000);
+                    });
+                });
+            }
+
+            if (qrisFileInput && qrisConfirmBtn) {
+                qrisFileInput.addEventListener('change', function () {
+                    var hasFile = qrisFileInput.files && qrisFileInput.files.length > 0;
+                    qrisConfirmBtn.disabled = !hasFile;
+
+                    if (qrisErrorEl) {
+                        qrisErrorEl.classList.add('hidden');
+                        qrisErrorEl.textContent = '';
+                    }
+                });
+
+                qrisConfirmBtn.addEventListener('click', function () {
+                    if (!currentQrisOrder || !currentQrisOrder.id_pesanan) {
+                        return;
+                    }
+
+                    var file = qrisFileInput.files && qrisFileInput.files[0];
+
+                    if (!file) {
+                        qrisErrorEl.textContent = 'Pilih foto bukti pembayaran terlebih dahulu.';
+                        qrisErrorEl.classList.remove('hidden');
+                        return;
+                    }
+
+                    var formData = new FormData();
+                    formData.append('bukti_bayar', file);
+
+                    qrisConfirmBtn.disabled = true;
+                    qrisConfirmBtn.textContent = 'Mengunggah bukti bayar…';
+
+                    fetch('/api/pesanan/' + currentQrisOrder.id_pesanan + '/konfirmasi-qris?kode=' + encodeURIComponent(currentQrisOrder.kode_akses || ''), {
+                        method: 'POST',
+                        headers: { 'Accept': 'application/json' },
+                        body: formData
+                    })
+                        .then(function (res) {
+                            return res.json()
+                                .catch(function () { return {}; })
+                                .then(function (body) {
+                                    if (!res.ok) {
+                                        throw new Error(messageFrom(res.status, body));
+                                    }
+
+                                    window.location.href = '/status';
+                                });
+                        })
+                        .catch(function (err) {
+                            qrisErrorEl.textContent = err.message || 'Gagal mengunggah bukti pembayaran.';
+                            qrisErrorEl.classList.remove('hidden');
+                            qrisConfirmBtn.disabled = false;
+                            qrisConfirmBtn.textContent = 'Kirim Bukti Pembayaran';
+                        });
+                });
+            }
+
             submitBtn.addEventListener('click', function () {
                 var items = lines();
 
@@ -402,6 +563,10 @@
                 var phoneEl = document.getElementById('customer-phone');
                 var name = nameEl ? nameEl.value.trim() : '';
                 var phone = phoneEl ? phoneEl.value.trim() : '';
+                var payMethod = selectedPaymentMethod();
+                var clientTotal = items.reduce(function (sum, line) {
+                    return sum + (line.product.price * line.qty);
+                }, 0);
 
                 if (nameRequired && !name) {
                     showError('Isi nama pemesan dulu ya.');
@@ -425,6 +590,7 @@
                         id_meja: tableId,
                         nama_pemesan: name,
                         no_whatsapp: phone,
+                        metode_pembayaran: payMethod,
                         items: items.map(function (line) {
                             return { id_produk: line.product.id, jumlah: line.qty };
                         })
@@ -452,6 +618,7 @@
                                 nomor: order.nomor_antrean,
                                 total: order.total_harga,
                                 kode: order.kode_akses,
+                                metode: payMethod,
                                 at: Date.now()
                             }));
                         } catch (e) {
@@ -461,8 +628,11 @@
                         PerkociCart.clear();
                         sent = true;
 
-                        // Langsung alihkan pelanggan ke halaman /status
-                        window.location.href = '/status';
+                        if (payMethod === 'qris') {
+                            openQrisModal(order, clientTotal);
+                        } else {
+                            window.location.href = '/status';
+                        }
                     })
                     .catch(function () {
                         showError('Tidak bisa terhubung ke server. Coba lagi sebentar.');
@@ -471,7 +641,6 @@
                         setBusy(false);
                         render();
                     });
-
             });
 
             render();

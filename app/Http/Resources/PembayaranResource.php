@@ -23,6 +23,10 @@ class PembayaranResource extends JsonResource
                 'total_harga' => (float) $this->pesanan->total_harga,
                 'status_pesanan' => $this->pesanan->status_pesanan,
                 'tanggal_pesan' => $this->pesanan->tanggal_pesan,
+                'bukti_bayar' => $this->pesanan->bukti_bayar,
+                'bukti_bayar_url' => $this->pesanan->bukti_bayar
+                    ? asset('storage/' . ltrim($this->pesanan->bukti_bayar, '/'))
+                    : null,
                 'meja' => $this->whenLoaded('pesanan.meja', fn () => [
                     'id_meja' => $this->pesanan->meja->id_meja,
                     'no_meja' => $this->pesanan->meja->no_meja,
