@@ -22,7 +22,7 @@ services:
     container_name: perkoci_nginx
     restart: unless-stopped
     ports:
-      - "8000:80"
+      - "1017:80"
     volumes:
       - ./:/var/www/html
       - ./docker/nginx/conf.d:/etc/nginx/conf.d
@@ -41,7 +41,7 @@ services:
       MYSQL_USER: user
       MYSQL_PASSWORD: password
     ports:
-      - "3309:3309"
+      - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
