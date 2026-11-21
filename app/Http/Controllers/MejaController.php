@@ -75,6 +75,9 @@ class MejaController extends Controller
             return response()->json(['message' => 'Meja tidak ditemukan atau QR tidak valid.'], 404);
         }
 
+        // QR takeaway harus selalu bisa dipakai, berapa pun pesanan aktifnya.
+        $meja->ensureAvailableIfTakeaway();
+
         return response()->json(['status' => 'success', 'data' => new MejaResource($meja)]);
     }
 

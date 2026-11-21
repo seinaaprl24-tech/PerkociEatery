@@ -17,8 +17,10 @@ class MejaResource extends JsonResource
         return [
             'id_meja' => $this->id_meja,
             'no_meja' => $this->no_meja,
+            'is_takeaway' => $this->resource->isTakeaway(),
             'qr_code' => $this->qr_code,
-            'status' => $this->status,
+            // Meja takeaway selalu dilaporkan tersedia ke UI.
+            'status' => $this->resource->isTakeaway() ? 'tersedia' : $this->status,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

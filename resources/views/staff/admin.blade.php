@@ -81,7 +81,8 @@
         </x-ui.section>
 
         {{-- Meja & QR --}}
-        <x-ui.section title="Meja & QR" description="Meja dengan pesanan aktif ditandai terisi.">
+        <x-ui.section title="Meja & QR"
+            description="Meja dengan pesanan aktif ditandai terisi. Meja takeaway selalu tersedia.">
             <x-slot:actions>
                 <a href="{{ route('admin.tables') }}" class="btn-secondary btn-sm">Kelola</a>
             </x-slot:actions>
@@ -227,15 +228,19 @@
                 Admin.clear(tablesEl);
 
                 tables.forEach(function (table) {
-                    var occupied = !!occupiedIds[table.id_meja];
-                    var styles = occupied
-                        ? 'border-brand/20 bg-brand/10 text-brand'
-                        : 'border-cocoa/10 bg-white text-cocoa/40';
+                    var isTakeawayTable = Admin.isTakeawayTable(table);
+                    var occupied = Admin.isTableOccupied(table, occupiedIds);
+                    var styles = isTakeawayTable
+                        ? 'border-butter bg-butter/20 text-cocoa'
+                        : (occupied
+                            ? 'border-brand/20 bg-brand/10 text-brand'
+                            : 'border-cocoa/10 bg-white text-cocoa/40');
 
                     var cell = Admin.make('div', 'rounded-xl border px-2 py-3 text-center ' + styles);
-                    cell.appendChild(Admin.make('p', 'font-display text-sm font-bold leading-none', table.no_meja));
+                    cell.appendChild(Admin.make('p', 'truncate font-display text-sm font-bold leading-none',
+                        isTakeawayTable ? 'Takeaway' : table.no_meja));
                     cell.appendChild(Admin.make('p', 'mt-1 text-[9px] font-bold uppercase tracking-[0.06em]',
-                        occupied ? 'Terisi' : 'Kosong'));
+                        Admin.tableStateLabel(table, occupied)));
                     tablesEl.appendChild(cell);
                 });
             }

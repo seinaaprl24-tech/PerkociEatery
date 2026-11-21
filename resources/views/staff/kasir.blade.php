@@ -80,11 +80,13 @@
     </div>
 
     {{-- Status meja --}}
-    <x-ui.section class="mt-4" title="Status Meja" description="Meja dengan pesanan aktif ditandai terisi.">
+    <x-ui.section class="mt-4" title="Status Meja"
+        description="Meja dengan pesanan aktif ditandai terisi. Meja takeaway selalu tersedia.">
         <x-slot:actions>
             <div class="flex flex-wrap items-center gap-3 text-[10px] font-semibold text-cocoa/45">
                 <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-brand"></span>Terisi</span>
                 <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-cocoa/20"></span>Kosong</span>
+                <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-butter"></span>Takeaway</span>
             </div>
         </x-slot:actions>
 
@@ -146,9 +148,17 @@
                 item.appendChild(iconWrap);
 
                 var info = Kasir.make('div', 'min-w-0 flex-1');
+                var titleRow = Kasir.make('div', 'flex min-w-0 items-center gap-1.5');
                 var title = Kasir.make('p', 'truncate text-xs font-bold text-cocoa', Kasir.tableLabel(order));
                 title.appendChild(Kasir.make('span', 'ml-1 font-medium text-cocoa/40', '· ' + order.nomor_antrean));
-                info.appendChild(title);
+                titleRow.appendChild(title);
+
+                var typeBadge = Kasir.takeawayBadge(order);
+                if (typeBadge) {
+                    titleRow.appendChild(typeBadge);
+                }
+
+                info.appendChild(titleRow);
                 info.appendChild(Kasir.make('p', 'mt-0.5 truncate text-[11px] text-cocoa/50', Kasir.menuSummary(order)));
                 info.appendChild(Kasir.make('p', 'mt-0.5 text-[10px] text-cocoa/35',
                     Kasir.itemCount(order) + ' item · ' + Kasir.ago(order.tanggal_pesan)));
@@ -175,7 +185,15 @@
                 var item = Kasir.make('li', 'rounded-xl border border-cocoa/10 px-3.5 py-3');
 
                 var head = Kasir.make('div', 'flex items-center justify-between gap-2');
-                head.appendChild(Kasir.make('p', 'text-xs font-bold text-cocoa', order.nomor_antrean));
+                var headLeft = Kasir.make('div', 'flex min-w-0 items-center gap-1.5');
+                headLeft.appendChild(Kasir.make('p', 'text-xs font-bold text-cocoa', order.nomor_antrean));
+
+                var typeBadge = Kasir.takeawayBadge(order);
+                if (typeBadge) {
+                    headLeft.appendChild(typeBadge);
+                }
+
+                head.appendChild(headLeft);
                 head.appendChild(Kasir.badge('neutral', Kasir.tableLabel(order)));
                 item.appendChild(head);
 
@@ -197,15 +215,19 @@
                     occupiedIds[order.id_meja] = true;
                 });
 
-                var occupied = tables.filter(function (table) {
-                    return occupiedIds[table.id_meja];
+                var physicalTables = tables.filter(function (table) {
+                    return !Kasir.isTakeawayTable(table);
+                });
+
+                var occupied = physicalTables.filter(function (table) {
+                    return Kasir.isTableOccupied(table, occupiedIds);
                 }).length;
 
                 Kasir.setStat('aktif', active.length);
                 Kasir.setStat('selesai', orders.filter(function (order) {
                     return order.status_pesanan === 'selesai' && Kasir.isToday(order.tanggal_pesan);
                 }).length);
-                Kasir.setStat('meja', occupied + ' / ' + tables.length);
+                Kasir.setStat('meja', occupied + ' / ' + physicalTables.length);
 
                 queueCount.textContent = active.length;
 
@@ -223,15 +245,19 @@
 
                 Kasir.clear(tablesEl);
                 tables.forEach(function (table) {
-                    var isOccupied = !!occupiedIds[table.id_meja];
-                    var styles = isOccupied
-                        ? 'border-brand/20 bg-brand/10 text-brand'
-                        : 'border-cocoa/10 bg-white text-cocoa/40';
+                    var isTakeawayTable = Kasir.isTakeawayTable(table);
+                    var isOccupied = Kasir.isTableOccupied(table, occupiedIds);
+                    var styles = isTakeawayTable
+                        ? 'border-butter bg-butter/20 text-cocoa'
+                        : (isOccupied
+                            ? 'border-brand/20 bg-brand/10 text-brand'
+                            : 'border-cocoa/10 bg-white text-cocoa/40');
 
                     var cell = Kasir.make('div', 'rounded-xl border px-2 py-3 text-center ' + styles);
-                    cell.appendChild(Kasir.make('p', 'font-display text-sm font-bold leading-none', table.no_meja));
+                    cell.appendChild(Kasir.make('p', 'truncate font-display text-sm font-bold leading-none',
+                        isTakeawayTable ? 'Takeaway' : table.no_meja));
                     cell.appendChild(Kasir.make('p', 'mt-1 text-[9px] font-bold uppercase tracking-[0.06em]',
-                        isOccupied ? 'Terisi' : 'Kosong'));
+                        Kasir.tableStateLabel(table, isOccupied)));
                     tablesEl.appendChild(cell);
                 });
             }

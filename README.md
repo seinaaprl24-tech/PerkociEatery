@@ -182,6 +182,13 @@ Identitas kedai (nama, alamat, telepon untuk struk) diatur di `config/perkoci.ph
 
 Akun dibuat oleh `database/seeders/UserSeeder.php` untuk tiga role: **admin**, **kasir**, dan **manager**. Password diambil dari `SEED_ADMIN_PASSWORD`, `SEED_KASIR_PASSWORD`, dan `SEED_MANAGER_PASSWORD`. Jika tidak diisi, seeder memakai `SEED_STAFF_PASSWORD`, lalu `password`.
 
+Setelah mengubah nilai `SEED_*` di `.env`, jalankan ulang seeder agar password di database ikut berubah:
+
+```bash
+php artisan config:clear
+php artisan db:seed --class=UserSeeder --force
+```
+
 Login staff ada di `/login`. Setelah masuk, pengguna diarahkan ke dashboard sesuai rolenya. **Ganti password bawaan sebelum aplikasi dipakai secara nyata.**
 
 ---

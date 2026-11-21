@@ -9,6 +9,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 
 class AuthController extends Controller
 {
@@ -33,9 +34,21 @@ class AuthController extends Controller
 
     public function login(Request $request): RedirectResponse
     {
+        // Normalisasi input: role boleh dikirim sebagai "Manager"/"MANAGER",
+        // dan username sering tidak sengaja mengandung spasi saat copy-paste.
+        $roleInput = trim((string) $request->input('role'));
+
+        $request->merge([
+            'username' => trim((string) $request->input('username')),
+            'role' => $roleInput === '' ? null : strtolower($roleInput),
+        ]);
+
         $credentials = $request->validate([
-            'username' => ['required', 'string'],
+            'username' => ['required', 'string', 'max:255'],
             'password' => ['required', 'string'],
+            'role' => ['nullable', Rule::in(User::ROLES)],
+        ], [
+            'role.in' => 'Role yang dipilih tidak valid.',
         ]);
 
         $user = User::where('username', $credentials['username'])->first();
@@ -43,7 +56,23 @@ class AuthController extends Controller
         if (! $user || ! Hash::check($credentials['password'], $user->password)) {
             return back()
                 ->withErrors(['username' => 'Username atau password salah.'])
-                ->onlyInput('username');
+                ->onlyInput('username', 'role');
+        }
+
+        $role = strtolower(trim((string) $user->role));
+
+        // Role yang dipilih di halaman login (jika ada) harus cocok dengan
+        // role akun. Jika tidak dipilih, role tetap mengikuti data akun.
+        if (! empty($credentials['role']) && $credentials['role'] !== $role) {
+            return back()
+                ->withErrors(['role' => 'Role yang dipilih tidak sesuai dengan akun ini.'])
+                ->onlyInput('username', 'role');
+        }
+
+        // Perbarui hash bila biaya bcrypt berubah, tanpa mengubah password.
+        if (Hash::needsRehash($user->password)) {
+            $user->password = $credentials['password'];
+            $user->save();
         }
 
         Auth::login($user, $request->boolean('remember'));
@@ -80,7 +109,7 @@ class AuthController extends Controller
 
     private function homeFor(User $user): string
     {
-        return match ($user->role) {
+        return match (strtolower(trim((string) $user->role))) {
             'admin' => '/admin',
             'kasir' => '/kasir',
             'manager' => '/manager',

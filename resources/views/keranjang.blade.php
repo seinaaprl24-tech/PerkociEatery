@@ -39,7 +39,7 @@
             </a>
         </div>
 
-        {{-- Panel meja terkunci --}}
+        {{-- Panel meja aktif --}}
         <div class="panel mt-4 p-4">
             <div class="flex items-start gap-3">
                 <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand/12 text-brand">
@@ -51,10 +51,18 @@
                         {{ $table['location'] }}
                     </p>
 
-                    <span class="pill-sm mt-1.5 bg-white text-olive">{{ $table['locked_pill'] }}</span>
+                    <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        <span class="pill-sm bg-white text-olive">
+                            {{ !empty($table['is_takeaway']) ? 'QR Takeaway Aktif' : $table['locked_pill'] }}
+                        </span>
+
+                        @if (!empty($table['is_takeaway']))
+                            <span class="pill-sm bg-butter text-cocoa">{{ $table['takeaway_pill'] }}</span>
+                        @endif
+                    </div>
 
                     <p class="mt-2 text-[11.5px] leading-relaxed text-cocoa/55">
-                        {{ $table['locked_desc'] }}
+                        {{ !empty($table['is_takeaway']) ? $table['takeaway_desc'] : $table['locked_desc'] }}
                     </p>
 
                     @if (empty($table['id_meja']))
@@ -73,7 +81,7 @@
             <p class="mt-1 text-xs text-cocoa/40">Pilih menu favoritmu dulu ya.</p>
         </div>
 
-        {{-- Kartu item (dirender JavaScript dari keranjang di browser) --}}
+        {{-- Kartu item --}}
         <div class="mt-4 space-y-3" data-cart-list></div>
 
         {{-- Tambah menu lain --}}
@@ -102,6 +110,13 @@
                 </label>
                 <input id="customer-phone" name="customer_phone" type="tel" inputmode="tel" class="field"
                     placeholder="{{ $customer['phone_placeholder'] }}" autocomplete="tel">
+
+                {{-- Kolom Catatan Pesanan --}}
+                <label class="field-label mt-3.5" for="customer-notes">
+                    Catatan Pesanan <span class="font-medium normal-case tracking-normal text-cocoa/35">(opsional)</span>
+                </label>
+                <textarea id="customer-notes" name="customer_notes" rows="2" class="field !h-20 !py-2.5"
+                    placeholder="Contoh: Jangan pakai es, pedas sedang, kuah dipisah..."></textarea>
 
                 <p class="mt-2.5 flex items-start gap-1.5 text-[11px] leading-relaxed text-cocoa/45">
                     <span class="ms mt-px shrink-0 text-[13px] leading-none text-cocoa/40">info</span>
@@ -169,7 +184,6 @@
                 <span class="pill-sm bg-lime text-cocoa" data-qris-queue>-</span>
             </div>
 
-            {{-- Nominal Tagihan --}}
             <div class="mt-3 flex items-center justify-between gap-2 rounded-2xl bg-sand px-4 py-2.5">
                 <div>
                     <p class="text-[10.5px] font-semibold text-cocoa/55">Total yang harus dibayar</p>
@@ -181,7 +195,6 @@
                 </button>
             </div>
 
-            {{-- Gambar QRIS DANA Bisnis --}}
             <div class="mt-3 flex flex-col items-center rounded-2xl border border-cocoa/10 bg-white p-2.5">
                 <img src="{{ asset('images/qris-perkoci.jpeg') }}" alt="QRIS DANA Bisnis Perkoci Eatery">
                 <p class="mt-1.5 text-center text-[10.5px] font-semibold text-cocoa/70">
@@ -189,7 +202,6 @@
                 </p>
             </div>
 
-            {{-- Upload Bukti Pembayaran (WAJIB) --}}
             <div class="mt-3 rounded-2xl border border-dashed border-brand/40 bg-brand/[0.04] p-3">
                 <label for="qris-proof-input" class="block text-[11.5px] font-bold text-cocoa">
                     Unggah Screenshot Bukti Transfer <span class="text-danger">*</span>
@@ -229,7 +241,6 @@
                     </div>
 
                     <p class="mt-0.5 text-[11px] font-semibold text-olive" data-unit-price></p>
-
                     <p class="mt-1.5 font-display text-[15px] font-bold text-brand" data-line-total></p>
 
                     <a href="#" data-detail
@@ -259,7 +270,7 @@
         </article>
     </template>
 
-    {{-- Thumbnail tiap menu (memakai komponen yang sama, dikloning oleh JavaScript) --}}
+    {{-- Thumbnail tiap menu --}}
     @foreach ($menu as $item)
         <template data-thumb="{{ $item['id'] }}">
             <x-menu-thumb :item="$item" size="text-[26px]" />
@@ -274,6 +285,7 @@
         (function () {
             var catalog = @json($catalog);
             var tableId = @json($table['id_meja'] ?? null);
+            var orderType = @json(!empty($table['is_takeaway']) ? 'takeaway' : 'dine_in');
             var nameRequired = @json((bool) $customer['name_required']);
 
             var listEl = document.querySelector('[data-cart-list]');
@@ -310,11 +322,9 @@
 
             function selectedPaymentMethod() {
                 var checked = document.querySelector('input[name="payment_method"]:checked');
-
                 return checked ? checked.value : 'tunai';
             }
 
-            /* Gabungkan isi keranjang browser dengan data menu terbaru dari server. */
             function lines() {
                 var rows = PerkociCart.read();
                 var out = [];
@@ -322,13 +332,10 @@
 
                 rows.forEach(function (row) {
                     var product = catalog[row.id];
-
                     if (!product || !product.available) {
                         return;
                     }
-
                     var qty = Math.max(1, Math.min(row.qty, product.stock));
-
                     out.push({ product: product, qty: qty });
                     clean.push({ id: product.id, qty: qty });
                 });
@@ -355,7 +362,6 @@
                 if (status === 429) {
                     return 'Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.';
                 }
-
                 if (status === 422 && body && body.errors) {
                     for (var key in body.errors) {
                         if (body.errors[key] && body.errors[key][0]) {
@@ -363,11 +369,9 @@
                         }
                     }
                 }
-
                 if (body && body.message && status < 500) {
                     return body.message;
                 }
-
                 return 'Pesanan belum bisa dikirim. Coba lagi sebentar.';
             }
 
@@ -416,26 +420,21 @@
 
             listEl.addEventListener('click', function (event) {
                 var card = event.target.closest('[data-cart-item]');
-
                 if (!card) {
                     return;
                 }
 
                 var id = parseInt(card.getAttribute('data-id'), 10);
                 var product = catalog[id];
-
                 if (!product) {
                     return;
                 }
 
                 var stepBtn = event.target.closest('[data-qty-step]');
-
                 if (stepBtn) {
                     var step = parseInt(stepBtn.getAttribute('data-qty-step'), 10);
-
                     PerkociCart.setQty(id, PerkociCart.qty(id) + step, product.stock);
                     render();
-
                     return;
                 }
 
@@ -479,7 +478,6 @@
                     if (!navigator.clipboard) {
                         return;
                     }
-
                     navigator.clipboard.writeText(String(rawQrisNominal)).then(function () {
                         qrisCopyBtn.textContent = 'Tersalin ✓';
                         setTimeout(function () {
@@ -506,7 +504,6 @@
                     }
 
                     var file = qrisFileInput.files && qrisFileInput.files[0];
-
                     if (!file) {
                         qrisErrorEl.textContent = 'Pilih foto bukti pembayaran terlebih dahulu.';
                         qrisErrorEl.classList.remove('hidden');
@@ -531,7 +528,6 @@
                                     if (!res.ok) {
                                         throw new Error(messageFrom(res.status, body));
                                     }
-
                                     window.location.href = '/status';
                                 });
                         })
@@ -546,7 +542,6 @@
 
             submitBtn.addEventListener('click', function () {
                 var items = lines();
-
                 if (busy || items.length === 0) {
                     return;
                 }
@@ -555,14 +550,15 @@
 
                 if (!tableId) {
                     showError('Meja belum terdeteksi. Scan QR di meja kamu dulu.');
-
                     return;
                 }
 
                 var nameEl = document.getElementById('customer-name');
                 var phoneEl = document.getElementById('customer-phone');
+                var notesEl = document.getElementById('customer-notes');
                 var name = nameEl ? nameEl.value.trim() : '';
                 var phone = phoneEl ? phoneEl.value.trim() : '';
+                var notes = notesEl ? notesEl.value.trim() : '';
                 var payMethod = selectedPaymentMethod();
                 var clientTotal = items.reduce(function (sum, line) {
                     return sum + (line.product.price * line.qty);
@@ -570,11 +566,9 @@
 
                 if (nameRequired && !name) {
                     showError('Isi nama pemesan dulu ya.');
-
                     if (nameEl) {
                         nameEl.focus();
                     }
-
                     return;
                 }
 
@@ -588,8 +582,10 @@
                     },
                     body: JSON.stringify({
                         id_meja: tableId,
+                        tipe_pesanan: orderType,
                         nama_pemesan: name,
                         no_whatsapp: phone,
+                        catatan: notes,
                         metode_pembayaran: payMethod,
                         items: items.map(function (line) {
                             return { id_produk: line.product.id, jumlah: line.qty };
@@ -606,23 +602,28 @@
                     .then(function (result) {
                         if (!result.ok) {
                             showError(messageFrom(result.status, result.body));
-
                             return;
                         }
 
-                        var order = (result.body && result.body.data) || {};
+                        var rawBody = result.body || {};
+                        var order = rawBody.data || rawBody;
+
+                        var orderId = order.id_pesanan || order.id;
+                        var orderKode = order.kode_akses || order.kode;
+                        var orderAntrean = order.nomor_antrean || order.nomor || '---';
+                        var orderTotal = order.total_harga || order.total || 0;
 
                         try {
                             window.localStorage.setItem('perkoci_last_order', JSON.stringify({
-                                id: order.id_pesanan,
-                                nomor: order.nomor_antrean,
-                                total: order.total_harga,
-                                kode: order.kode_akses,
+                                id: orderId,
+                                nomor: orderAntrean,
+                                total: orderTotal,
+                                kode: orderKode,
                                 metode: payMethod,
                                 at: Date.now()
                             }));
                         } catch (e) {
-                            /* abaikan jika penyimpanan ditolak */
+                            console.error('Gagal simpan localstorage:', e);
                         }
 
                         PerkociCart.clear();

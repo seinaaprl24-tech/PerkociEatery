@@ -12,8 +12,6 @@ use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
-    private const ROLES = ['admin', 'kasir', 'manager'];
-
     public function index(): AnonymousResourceCollection
     {
         $users = User::orderByDesc('id_user')->paginate(10);
@@ -27,7 +25,7 @@ class UserController extends Controller
             'nama' => ['required', 'string', 'max:255'],
             'username' => ['required', 'string', 'max:255', 'unique:users,username'],
             'password' => ['required', 'string', 'min:6'],
-            'role' => ['required', Rule::in(self::ROLES)],
+            'role' => ['required', Rule::in(User::ROLES)],
         ]);
 
         // Password otomatis di-hash oleh cast 'hashed' pada model User.
@@ -49,7 +47,7 @@ class UserController extends Controller
             'nama' => ['sometimes', 'required', 'string', 'max:255'],
             'username' => ['sometimes', 'required', 'string', 'max:255', Rule::unique('users', 'username')->ignore($user->id_user, 'id_user')],
             'password' => ['sometimes', 'nullable', 'string', 'min:6'],
-            'role' => ['sometimes', 'required', Rule::in(self::ROLES)],
+            'role' => ['sometimes', 'required', Rule::in(User::ROLES)],
         ]);
 
         // Password kosong/null = tidak diganti (jangan sampai menimpa dengan null).

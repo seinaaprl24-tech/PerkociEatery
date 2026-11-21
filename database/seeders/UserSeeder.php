@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 /**
  * Akun staf (Admin, Kasir, Manager) dengan password masing-masing.
@@ -12,33 +13,34 @@ use Illuminate\Database\Seeder;
  *   SEED_ADMIN_PASSWORD, SEED_KASIR_PASSWORD, SEED_MANAGER_PASSWORD
  * Jika kosong, dipakai SEED_STAFF_PASSWORD, lalu "password" (hanya untuk uji lokal).
  *
- * Menjalankan seeder ini lagi akan MENGATUR ULANG password ketiga akun
- * sesuai nilai di .env.
+ * Nilainya dibaca lewat config/seed.php supaya tetap tersedia saat config
+ * di-cache. Menjalankan seeder ini lagi akan MENGATUR ULANG password ketiga
+ * akun sesuai nilai di .env.
  */
 class UserSeeder extends Seeder
 {
     public function run(): void
     {
-        $fallback = env('SEED_STAFF_PASSWORD', 'password');
+        $fallback = config('seed.fallback', 'password');
 
         $staff = [
             [
                 'nama' => 'Admin Perkoci',
                 'username' => 'admin',
                 'role' => 'admin',
-                'password' => env('SEED_ADMIN_PASSWORD') ?: $fallback,
+                'password' => config('seed.admin') ?: $fallback,
             ],
             [
                 'nama' => 'Kasir Perkoci',
                 'username' => 'kasir',
                 'role' => 'kasir',
-                'password' => env('SEED_KASIR_PASSWORD') ?: $fallback,
+                'password' => config('seed.kasir') ?: $fallback,
             ],
             [
                 'nama' => 'Manager Perkoci',
                 'username' => 'manager',
                 'role' => 'manager',
-                'password' => env('SEED_MANAGER_PASSWORD') ?: $fallback,
+                'password' => config('seed.manager') ?: $fallback,
             ],
         ];
 
@@ -48,7 +50,8 @@ class UserSeeder extends Seeder
                 [
                     'nama' => $data['nama'],
                     'role' => $data['role'],
-                    'password' => $data['password'],
+                    // Hash eksplisit agar tidak bergantung pada cast model.
+                    'password' => Hash::make($data['password']),
                 ],
             );
         }

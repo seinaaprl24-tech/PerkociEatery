@@ -19,9 +19,11 @@ class Pesanan extends Model
 
     protected $fillable = [
         'id_meja',
+        'tipe_pesanan',
         'nomor_antrean',
         'nama_pemesan',
         'no_whatsapp',
+        'catatan',
         'kode_akses',
         'tanggal_pesan',
         'total_harga',
@@ -34,6 +36,14 @@ class Pesanan extends Model
     protected $casts = [
         'tanggal_pesan' => 'datetime',
     ];
+
+    /**
+     * Apakah pesanan ini dibungkus (takeaway)?
+     */
+    public function isTakeaway(): bool
+    {
+        return $this->tipe_pesanan === 'takeaway';
+    }
 
     public function meja()
     {

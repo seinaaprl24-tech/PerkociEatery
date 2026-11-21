@@ -66,9 +66,9 @@
         </div>
 
         <x-ui.table data-orders-table class="rounded-none border-0"
-            :head="['Pesanan', 'Meja', 'Pelanggan', 'Menu', 'Item', 'Waktu', 'Total', 'Status', 'Aksi']">
+            :head="['Pesanan', 'Meja', 'Pelanggan', 'Menu', 'Catatan', 'Item', 'Waktu', 'Total', 'Status', 'Aksi']">
             <tr data-placeholder>
-                <td colspan="9" class="px-4 py-10 text-center text-sm text-cocoa/45">Memuat pesanan…</td>
+                <td colspan="10" class="px-4 py-10 text-center text-sm text-cocoa/45">Memuat pesanan…</td>
             </tr>
         </x-ui.table>
     </x-ui.section>
@@ -120,10 +120,33 @@
             function row(order) {
                 var tr = document.createElement('tr');
 
-                tr.appendChild(cell('font-semibold text-cocoa', order.nomor_antrean));
+                var orderCell = cell('whitespace-nowrap');
+                orderCell.appendChild(Kasir.make('span', 'font-semibold text-cocoa', order.nomor_antrean));
+
+                var typeBadge = Kasir.takeawayBadge(order);
+                if (typeBadge) {
+                    typeBadge.classList.add('ml-1.5');
+                    orderCell.appendChild(typeBadge);
+                }
+
+                tr.appendChild(orderCell);
                 tr.appendChild(cell('whitespace-nowrap', Kasir.tableLabel(order)));
                 tr.appendChild(cell('whitespace-nowrap', Kasir.customer(order) || '—'));
-                tr.appendChild(cell('min-w-[220px] text-cocoa/70', Kasir.menuSummary(order)));
+                tr.appendChild(cell('min-w-[180px] text-cocoa/70', Kasir.menuSummary(order)));
+
+                // Kolom Catatan dari Pelanggan
+                var notesCell = document.createElement('td');
+                notesCell.className = 'max-w-[200px] text-xs text-cocoa/80';
+                if (order.catatan) {
+                    var noteBox = document.createElement('div');
+                    noteBox.className = 'rounded-lg bg-sand/60 px-2.5 py-1.5 border border-cocoa/10 font-medium';
+                    noteBox.textContent = order.catatan;
+                    notesCell.appendChild(noteBox);
+                } else {
+                    notesCell.textContent = '—';
+                }
+                tr.appendChild(notesCell);
+
                 tr.appendChild(cell('whitespace-nowrap', Kasir.itemCount(order) + ' item'));
                 tr.appendChild(cell('whitespace-nowrap', Kasir.ago(order.tanggal_pesan)));
                 tr.appendChild(cell('whitespace-nowrap font-semibold text-cocoa', Kasir.rupiah(order.total_harga)));

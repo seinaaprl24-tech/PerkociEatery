@@ -1,4 +1,4 @@
-{{-- Manager – Laporan Keuangan: pemasukan nyata dari /api/laporan/penjualan. Pengeluaran belum punya API. --}}
+{{-- Manager – Laporan Keuangan: pemasukan nyata dari /api/laporan/penjualan + placeholder pengeluaran. --}}
 @extends('layouts.staff')
 
 @section('title', $role['finance_page']['title'].' — Perkoci Eatery')
@@ -23,38 +23,81 @@
     <p data-flash class="hidden" role="status"></p>
 
     {{-- Pilih periode & metode --}}
-    <x-ui.section class="mt-5" title="Periode" description="Pilih rentang tanggal dan metode pembayaran. Maksimal 120 hari.">
-        <div class="flex flex-wrap gap-2" data-presets>
-            <button type="button" class="chip" data-preset="today" aria-pressed="false">Hari Ini</button>
-            <button type="button" class="chip" data-preset="7" aria-pressed="false">7 Hari</button>
-            <button type="button" class="chip" data-preset="30" aria-pressed="false">30 Hari</button>
-            <button type="button" class="chip chip-active" data-preset="month" aria-pressed="true">Bulan Ini</button>
+    <style>
+        .periode-clean .chip {
+            border-radius: 10px !important;
+            padding: 9px 18px !important;
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            line-height: 1.2 !important;
+        }
+        .periode-clean .chip.chip-active {
+            font-weight: 700 !important;
+        }
+        .periode-clean .periode-methods-group {
+            margin-left: 28px;
+        }
+        @media (max-width: 768px) {
+            .periode-clean .periode-methods-group {
+                margin-left: 0;
+            }
+        }
+        .periode-clean .periode-date-box {
+            width: 185px;
+            max-width: 100%;
+        }
+        .periode-clean .field {
+            width: 100% !important;
+            height: 44px !important;
+            border-radius: 10px !important;
+            padding: 0 14px !important;
+            font-size: 13.5px !important;
+            font-weight: 500 !important;
+        }
+        .periode-clean .periode-apply {
+            height: 44px !important;
+            padding: 0 28px !important;
+            border-radius: 10px !important;
+            font-size: 13.5px !important;
+            font-weight: 700 !important;
+        }
+    </style>
+
+    <x-ui.section class="mt-5 periode-clean" title="Periode" description="Pilih rentang tanggal dan metode pembayaran. Maksimal 120 hari.">
+        <div class="flex flex-wrap items-center gap-y-3">
+            <div class="flex flex-wrap items-center gap-2" data-presets>
+                <span class="mr-1 text-[11px] font-extrabold uppercase tracking-[0.06em] text-cocoa">Periode:</span>
+                <button type="button" class="chip" data-preset="today" aria-pressed="false">Hari Ini</button>
+                <button type="button" class="chip" data-preset="7" aria-pressed="false">7 Hari</button>
+                <button type="button" class="chip" data-preset="30" aria-pressed="false">30 Hari</button>
+                <button type="button" class="chip chip-active" data-preset="month" aria-pressed="true">Bulan Ini</button>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2 periode-methods-group" data-methods>
+                <span class="mr-1 text-[11px] font-extrabold uppercase tracking-[0.06em] text-cocoa">Metode:</span>
+                <button type="button" class="chip chip-active" data-method="all" aria-pressed="true">Semua</button>
+                <button type="button" class="chip" data-method="tunai" aria-pressed="false">Tunai</button>
+                <button type="button" class="chip" data-method="qris" aria-pressed="false">QRIS</button>
+            </div>
         </div>
 
-        <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-cocoa/10 pt-3" data-methods>
-            <span class="mr-1 text-[11px] font-bold uppercase tracking-[0.08em] text-cocoa/45">Metode:</span>
-            <button type="button" class="chip chip-active" data-method="all" aria-pressed="true">Semua</button>
-            <button type="button" class="chip" data-method="tunai" aria-pressed="false">Tunai</button>
-            <button type="button" class="chip" data-method="qris" aria-pressed="false">QRIS</button>
-        </div>
-
-        <div class="mt-3 flex flex-wrap items-end gap-3">
-            <div class="w-full sm:w-44">
-                <label class="field-label" for="period-start">Dari</label>
-                <input id="period-start" type="date" class="field" data-start>
+        <div class="mt-4 flex flex-wrap items-end gap-3.5 border-t border-cocoa/10 pt-4">
+            <div class="periode-date-box">
+                <label class="field-label" style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em;" for="finance-start">Dari</label>
+                <input id="finance-start" type="date" class="field" data-start>
             </div>
-            <div class="w-full sm:w-44">
-                <label class="field-label" for="period-end">Sampai</label>
-                <input id="period-end" type="date" class="field" data-end>
+            <div class="periode-date-box">
+                <label class="field-label" style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em;" for="finance-end">Sampai</label>
+                <input id="finance-end" type="date" class="field" data-end>
             </div>
-            <button type="button" class="btn-primary btn-sm" data-apply>Terapkan</button>
+            <button type="button" class="btn-primary periode-apply" data-apply>Terapkan</button>
         </div>
     </x-ui.section>
 
     <div class="mt-4 grid gap-3 sm:grid-cols-3">
         <x-ui.stat-card data-stat="income" label="Total Pemasukan" value="Rp 0" icon="south_west" tone="lime"
             hint="pembayaran lunas, tanpa kembalian" />
-        <x-ui.stat-card data-stat="count" label="Jumlah Transaksi" value="0" icon="receipt_long" tone="brand"
+        <x-ui.stat-card data-stat="orders" label="Jumlah Transaksi" value="0" icon="receipt_long" tone="brand"
             hint="pada periode ini" />
         <x-ui.stat-card data-stat="average" label="Rata-rata / Transaksi" value="Rp 0" icon="trending_up" tone="butter"
             hint="pemasukan / transaksi" />
@@ -70,7 +113,7 @@
         </x-ui.section>
 
         <x-ui.section title="Pemasukan per Hari" description="Total pemasukan setiap tanggal." flush>
-            <x-ui.table data-day-table class="rounded-none border-0" :head="['Tanggal', 'Transaksi', 'Nominal']">
+            <x-ui.table data-daily-table class="rounded-none border-0" :head="['Tanggal', 'Transaksi', 'Nominal']">
                 <tr data-placeholder>
                     <td colspan="3" class="px-4 py-10 text-center text-sm text-cocoa/45">Memuat…</td>
                 </tr>
@@ -78,10 +121,9 @@
         </x-ui.section>
     </div>
 
-    {{-- Pengeluaran --}}
     <x-ui.section class="mt-4" title="Pengeluaran"
         description="Pencatatan pengeluaran (bahan, gaji, operasional) belum tersedia.">
-        <x-ui.empty-state icon="receipt" title="Belum ada pencatatan pengeluaran"
+        <x-ui.empty-state icon="receipt_long" title="Belum ada pencatatan pengeluaran"
             description="Saldo bersih (pemasukan dikurangi pengeluaran) akan tampil setelah fitur pengeluaran dibuat." />
     </x-ui.section>
 @endsection
@@ -98,7 +140,7 @@
             var methodButtons = Array.prototype.slice.call(document.querySelectorAll('[data-method]'));
             var periodLabel = document.querySelector('[data-period-label]');
             var methodBody = document.querySelector('[data-method-table] tbody');
-            var dayBody = document.querySelector('[data-day-table] tbody');
+            var dailyBody = document.querySelector('[data-daily-table] tbody');
             var PRESET_LABEL = { today: 'Hari Ini', '7': '7 Hari', '30': '30 Hari', month: 'Bulan Ini' };
             var METHOD_LABEL = { all: '', tunai: ' · Tunai', qris: ' · QRIS' };
 
@@ -126,42 +168,59 @@
                 });
             }
 
-            function fillTable(body, rows, totals) {
-                Manager.clear(body);
+            function renderMethods(methods, totalOrders, totalIncome) {
+                Manager.clear(methodBody);
 
-                rows.forEach(function (row) {
-                    var tr = document.createElement('tr');
-
-                    tr.appendChild(Manager.make('td', 'font-semibold text-cocoa', row.label));
-                    tr.appendChild(Manager.make('td', '', row.count));
-                    tr.appendChild(Manager.make('td', 'whitespace-nowrap font-semibold text-cocoa', Manager.rupiah(row.amount)));
-                    body.appendChild(tr);
-                });
-
-                if (rows.length === 0) {
+                if (methods.length === 0) {
                     var empty = document.createElement('tr');
-                    var cell = Manager.make('td', 'px-4 py-10 text-center text-sm text-cocoa/45', 'Belum ada pemasukan untuk filter ini.');
+                    var cell = Manager.make('td', 'px-4 py-8 text-center text-sm text-cocoa/45', 'Belum ada pembayaran pada periode ini.');
                     cell.colSpan = 3;
                     empty.appendChild(cell);
-                    body.appendChild(empty);
+                    methodBody.appendChild(empty);
 
                     return;
                 }
 
+                methods.forEach(function (row) {
+                    var tr = document.createElement('tr');
+
+                    tr.appendChild(Manager.make('td', 'font-semibold text-cocoa', row.name));
+                    tr.appendChild(Manager.make('td', '', row.count));
+                    tr.appendChild(Manager.make('td', 'whitespace-nowrap font-semibold text-cocoa', Manager.rupiah(row.amount)));
+                    methodBody.appendChild(tr);
+                });
+
                 var total = document.createElement('tr');
                 total.className = 'bg-sand/60';
                 total.appendChild(Manager.make('td', 'font-bold text-cocoa', 'Total'));
-                total.appendChild(Manager.make('td', 'font-bold text-cocoa', totals.count));
-                total.appendChild(Manager.make('td', 'whitespace-nowrap font-bold text-cocoa', Manager.rupiah(totals.amount)));
-                body.appendChild(total);
+                total.appendChild(Manager.make('td', 'font-bold text-cocoa', totalOrders));
+                total.appendChild(Manager.make('td', 'whitespace-nowrap font-bold text-cocoa', Manager.rupiah(totalIncome)));
+                methodBody.appendChild(total);
             }
 
-            function orderNetIncome(order) {
-                var p = order.pembayaran || {};
-                if (p.jumlah_bayar !== undefined && p.jumlah_bayar !== null) {
-                    return (Number(p.jumlah_bayar) || 0) - (Number(p.kembalian) || 0);
+            function renderDaily(days) {
+                Manager.clear(dailyBody);
+
+                var active = days.filter(function (day) { return day.orders > 0; });
+
+                if (active.length === 0) {
+                    var empty = document.createElement('tr');
+                    var cell = Manager.make('td', 'px-4 py-8 text-center text-sm text-cocoa/45', 'Belum ada pemasukan pada periode ini.');
+                    cell.colSpan = 3;
+                    empty.appendChild(cell);
+                    dailyBody.appendChild(empty);
+
+                    return;
                 }
-                return Number(order.total_harga) || 0;
+
+                active.forEach(function (day) {
+                    var tr = document.createElement('tr');
+
+                    tr.appendChild(Manager.make('td', 'font-semibold text-cocoa', Manager.longDay(day.date)));
+                    tr.appendChild(Manager.make('td', '', day.orders));
+                    tr.appendChild(Manager.make('td', 'whitespace-nowrap font-semibold text-cocoa', Manager.rupiah(day.revenue)));
+                    dailyBody.appendChild(tr);
+                });
             }
 
             function renderFiltered() {
@@ -179,30 +238,22 @@
                     return Manager.methodName(order).toLowerCase().indexOf(selectedMethod) !== -1;
                 });
 
-                var count = selectedMethod === 'all'
+                var transactions = selectedMethod === 'all'
                     ? (Number(lastSales.total_transaksi) || filteredOrders.length)
                     : filteredOrders.length;
 
                 var income = selectedMethod === 'all'
                     ? (Number(lastSales.total_pendapatan) || 0)
-                    : filteredOrders.reduce(function (sum, order) { return sum + orderNetIncome(order); }, 0);
+                    : filteredOrders.reduce(function (sum, order) { return sum + (Number(order.total_harga) || 0); }, 0);
+
+                var days = Manager.groupByDay(filteredOrders, currentRange.start, currentRange.end);
 
                 Manager.setStat('income', Manager.rupiah(income));
-                Manager.setStat('count', count);
-                Manager.setStat('average', Manager.rupiah(count > 0 ? Math.round(income / count) : 0));
+                Manager.setStat('orders', transactions);
+                Manager.setStat('average', Manager.rupiah(transactions > 0 ? Math.round(income / transactions) : 0));
 
-                var methods = Manager.byMethod(filteredOrders).map(function (row) {
-                    return { label: row.name, count: row.count, amount: row.amount };
-                });
-
-                var days = Manager.groupByDay(filteredOrders, currentRange.start, currentRange.end)
-                    .filter(function (day) { return day.orders > 0; })
-                    .map(function (day) {
-                        return { label: Manager.longDay(day.date), count: day.orders, amount: day.revenue };
-                    });
-
-                fillTable(methodBody, methods, { count: count, amount: income });
-                fillTable(dayBody, days, { count: count, amount: income });
+                renderMethods(Manager.byMethod(filteredOrders), transactions, income);
+                renderDaily(days);
             }
 
             function load(start, end, label) {

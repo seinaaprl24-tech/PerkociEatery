@@ -113,7 +113,12 @@ class ModelRelationTest extends TestCase
         $this->user = User::factory()->kasir()->create();
         $this->meja = Meja::create(['no_meja' => '01', 'qr_code' => 'MEJA-01', 'status' => 'tersedia']);
         $this->produk = Produk::create(['nama_produk' => 'Kopi Susu', 'kategori' => 'Signature Coffee', 'harga' => 18000, 'status' => 'aktif']);
-        $this->stok = Stok::create(['id_produk' => $this->produk->id_produk, 'jumlah_stok' => 10, 'min_stok' => 2, 'updated_at' => now()]);
+        // Produk baru otomatis dibuatkan baris stok oleh AppServiceProvider,
+        // jadi gunakan updateOrCreate agar tidak melanggar unique(id_produk).
+        $this->stok = Stok::updateOrCreate(
+            ['id_produk' => $this->produk->id_produk],
+            ['jumlah_stok' => 10, 'min_stok' => 2, 'updated_at' => now()],
+        );
         $this->pesanan = Pesanan::create([
             'id_meja' => $this->meja->id_meja,
             'nomor_antrean' => 'A-001',

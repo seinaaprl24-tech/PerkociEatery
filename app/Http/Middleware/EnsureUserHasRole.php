@@ -16,9 +16,13 @@ class EnsureUserHasRole
             return redirect()->route('login');
         }
 
-        $role = strtolower((string) $request->user()->role);
+        $role = strtolower(trim((string) $request->user()->role));
+        $allowedRoles = array_map(
+            fn (string $allowed) => strtolower(trim($allowed)),
+            $roles,
+        );
 
-        if (! in_array($role, $roles, true)) {
+        if (! in_array($role, $allowedRoles, true)) {
             abort(403, 'Anda tidak memiliki akses ke halaman ini.');
         }
 

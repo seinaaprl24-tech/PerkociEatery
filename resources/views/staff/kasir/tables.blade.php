@@ -20,15 +20,15 @@
 
     <div class="mt-5 grid gap-3 sm:grid-cols-3">
         <x-ui.stat-card data-stat="total" label="Total Meja" value="0" icon="table_restaurant" tone="brand"
-            hint="terdaftar di sistem" />
+            hint="termasuk takeaway" />
         <x-ui.stat-card data-stat="terisi" label="Terisi" value="0" icon="groups" tone="lime"
-            hint="punya pesanan aktif" />
+            hint="meja dine-in aktif" />
         <x-ui.stat-card data-stat="kosong" label="Kosong" value="0" icon="event_seat" tone="butter"
-            hint="siap dipakai" />
+            hint="meja dine-in siap dipakai" />
     </div>
 
     <x-ui.section class="mt-4" title="Daftar Meja"
-        description="Tombol QR menyalin link pesan untuk meja tersebut. Perubahan data meja dilakukan admin.">
+        description="Tombol QR menyalin link pesan untuk meja tersebut. Meja takeaway selalu tersedia dan bisa dipakai banyak pelanggan bersamaan.">
         <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3" data-tables></div>
 
         <div data-tables-empty class="hidden">
@@ -52,11 +52,11 @@
                 var url = origin + '/menu?meja=' + encodeURIComponent(table.qr_code);
 
                 function done() {
-                    Kasir.flash(flashEl, 'success', 'Link Meja ' + table.no_meja + ' disalin: ' + url);
+                    Kasir.flash(flashEl, 'success', 'Link ' + Kasir.tableName(table) + ' disalin: ' + url);
                 }
 
                 function fallback() {
-                    Kasir.flash(flashEl, 'success', 'Link Meja ' + table.no_meja + ': ' + url);
+                    Kasir.flash(flashEl, 'success', 'Link ' + Kasir.tableName(table) + ': ' + url);
                 }
 
                 if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -67,25 +67,29 @@
             }
 
             function card(table, occupied) {
-                var styles = occupied
-                    ? 'border-brand/20 bg-brand/10 text-brand'
-                    : 'border-cocoa/10 bg-white text-cocoa/45';
+                var isTakeaway = Kasir.isTakeawayTable(table);
+                var styles = isTakeaway
+                    ? 'border-butter bg-butter/20 text-cocoa'
+                    : (occupied
+                        ? 'border-brand/20 bg-brand/10 text-brand'
+                        : 'border-cocoa/10 bg-white text-cocoa/45');
 
                 var item = Kasir.make('div', 'flex items-center gap-3 rounded-xl border px-3.5 py-3 ' + styles);
 
                 item.appendChild(Kasir.make('span',
                     'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/70 font-display text-xs font-bold',
-                    table.no_meja));
+                    isTakeaway ? 'TA' : table.no_meja));
 
                 var info = Kasir.make('div', 'min-w-0 flex-1');
-                info.appendChild(Kasir.make('p', 'truncate text-xs font-bold', 'Meja ' + table.no_meja));
-                info.appendChild(Kasir.make('p', 'mt-0.5 truncate text-[10px] opacity-70', occupied ? 'Terisi' : 'Kosong'));
+                info.appendChild(Kasir.make('p', 'truncate text-xs font-bold', Kasir.tableName(table)));
+                info.appendChild(Kasir.make('p', 'mt-0.5 truncate text-[10px] opacity-70',
+                    isTakeaway ? 'Selalu tersedia' : (occupied ? 'Terisi' : 'Kosong')));
                 item.appendChild(info);
 
                 var qrBtn = Kasir.button('', 'btn-icon h-8 w-8', function () {
                     copyLink(table);
                 });
-                qrBtn.setAttribute('aria-label', 'Salin link QR Meja ' + table.no_meja);
+                qrBtn.setAttribute('aria-label', 'Salin link QR ' + Kasir.tableName(table));
                 var qrIcon = Kasir.make('span', 'ms text-[16px] leading-none', 'qr_code_2');
                 qrIcon.setAttribute('aria-hidden', 'true');
                 qrBtn.appendChild(qrIcon);
@@ -101,17 +105,21 @@
                     occupiedIds[order.id_meja] = true;
                 });
 
-                var occupied = tables.filter(function (table) {
-                    return occupiedIds[table.id_meja];
+                var physicalTables = tables.filter(function (table) {
+                    return !Kasir.isTakeawayTable(table);
+                });
+
+                var occupied = physicalTables.filter(function (table) {
+                    return Kasir.isTableOccupied(table, occupiedIds);
                 }).length;
 
                 Kasir.setStat('total', tables.length);
                 Kasir.setStat('terisi', occupied);
-                Kasir.setStat('kosong', tables.length - occupied);
+                Kasir.setStat('kosong', physicalTables.length - occupied);
 
                 Kasir.clear(gridEl);
                 tables.forEach(function (table) {
-                    gridEl.appendChild(card(table, !!occupiedIds[table.id_meja]));
+                    gridEl.appendChild(card(table, Kasir.isTableOccupied(table, occupiedIds)));
                 });
 
                 emptyEl.classList.toggle('hidden', tables.length > 0);

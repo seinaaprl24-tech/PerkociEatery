@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StorePesananRequest;
 use App\Http\Resources\PesananResource;
 use App\Models\DetailPesanan;
+use App\Models\Meja;
 use App\Models\Pesanan;
 use App\Models\Produk;
 use App\Models\Stok;
@@ -22,15 +23,19 @@ use Illuminate\Validation\ValidationException;
 class PesananController extends Controller
 {
     /**
-     * Daftar pesanan, terbaru dulu.
-     * Pesanan QRIS yang belum upload bukti bayar tidak ditampilkan ke kasir/dapur.
+     * Menampilkan daftar pesanan.
      */
     public function index(Request $request): AnonymousResourceCollection
     {
-        $query = Pesanan::with(['meja', 'detailPesanan.produk'])
-            ->orderByDesc('id_pesanan');
+        $query = Pesanan::with([
+            'meja',
+            'detailPesanan.produk',
+        ])->orderByDesc('id_pesanan');
 
-        if (Schema::hasColumn('pesanan', 'metode_pembayaran') && Schema::hasColumn('pesanan', 'status_pembayaran')) {
+        if (
+            Schema::hasColumn('pesanan', 'metode_pembayaran') &&
+            Schema::hasColumn('pesanan', 'status_pembayaran')
+        ) {
             $query->where(function ($q) {
                 $q->where('metode_pembayaran', '!=', 'qris')
                     ->orWhereNull('metode_pembayaran')
@@ -41,28 +46,56 @@ class PesananController extends Controller
         $status = $request->query('status');
 
         if (is_string($status) && $status !== '') {
-            $query->whereIn('status_pesanan', array_filter(explode(',', $status)));
+            $query->whereIn(
+                'status_pesanan',
+                array_filter(explode(',', $status))
+            );
         }
 
-        $perPage = min(max((int) $request->query('per_page', 10), 1), 100);
+        $perPage = min(
+            max((int) $request->query('per_page', 10), 1),
+            100
+        );
 
-        return PesananResource::collection($query->paginate($perPage)->withQueryString());
+        return PesananResource::collection(
+            $query->paginate($perPage)->withQueryString()
+        );
     }
 
-    public function show(Request $request, Pesanan $pesanan): PesananResource
-    {
+    /**
+     * Menampilkan detail pesanan.
+     */
+    public function show(
+        Request $request,
+        Pesanan $pesanan
+    ): PesananResource {
         $this->authorizeAccess($request, $pesanan);
 
-        return new PesananResource($pesanan->load(['meja', 'detailPesanan.produk', 'pembayaran']));
+        return new PesananResource(
+            $pesanan->load([
+                'meja',
+                'detailPesanan.produk',
+                'pembayaran',
+            ])
+        );
     }
 
+    /**
+     * Membuat pesanan baru.
+     */
     public function store(StorePesananRequest $request): JsonResponse
     {
         $validated = $request->validated();
 
-        if (! isset($validated['metode_pembayaran'])) {
-            $validated['metode_pembayaran'] = $request->input('metode_pembayaran', 'tunai');
+        if (!isset($validated['metode_pembayaran'])) {
+            $validated['metode_pembayaran'] =
+                $request->input('metode_pembayaran', 'tunai');
         }
+
+        // Meja takeaway kasir selalu menghasilkan pesanan takeaway,
+        // meskipun client tidak mengirim tipe_pesanan.
+        $validated['tipe_pesanan'] =
+            $this->resolveTipePesanan($validated);
 
         $pesanan = null;
 
@@ -71,34 +104,60 @@ class PesananController extends Controller
                 $pesanan = $this->simpanPesanan($validated);
                 break;
             } catch (UniqueConstraintViolationException $e) {
-                // Nomor antrean bentrok dengan pesanan lain yang masuk bersamaan: coba lagi.
                 if ($percobaan === 3) {
                     throw $e;
                 }
             }
         }
 
-        return (new PesananResource($pesanan->load(['meja', 'detailPesanan.produk'])))
+        return (new PesananResource(
+            $pesanan->load([
+                'meja',
+                'detailPesanan.produk',
+            ])
+        ))
             ->response()
             ->setStatusCode(201);
     }
 
+    /**
+     * Menyimpan pesanan menggunakan database transaction.
+     */
     private function simpanPesanan(array $validated): Pesanan
     {
         return DB::transaction(function () use ($validated) {
+
+            // Pesanan takeaway memakai satu meja virtual. Kunci baris meja
+            // ini agar pesanan bersamaan diproses berurutan dan statusnya
+            // tetap "tersedia" (tidak pernah terkunci sebagai "terisi").
+            if (($validated['tipe_pesanan'] ?? 'dine_in') === 'takeaway') {
+                $meja = Meja::whereKey($validated['id_meja'])
+                    ->lockForUpdate()
+                    ->first();
+
+                $meja?->ensureAvailableIfTakeaway();
+            }
+
             $dataPesanan = [
                 'id_meja' => $validated['id_meja'],
                 'nomor_antrean' => $this->generateNomorAntrean(),
                 'nama_pemesan' => $validated['nama_pemesan'] ?? null,
                 'no_whatsapp' => $validated['no_whatsapp'] ?? null,
+                'catatan' => $validated['catatan'] ?? null,
                 'kode_akses' => Str::random(12),
                 'tanggal_pesan' => Carbon::now(),
                 'total_harga' => 0,
                 'status_pesanan' => 'menunggu',
             ];
 
+            if (Schema::hasColumn('pesanan', 'tipe_pesanan')) {
+                $dataPesanan['tipe_pesanan'] =
+                    $validated['tipe_pesanan'] ?? 'dine_in';
+            }
+
             if (Schema::hasColumn('pesanan', 'metode_pembayaran')) {
-                $dataPesanan['metode_pembayaran'] = $validated['metode_pembayaran'] ?? 'tunai';
+                $dataPesanan['metode_pembayaran'] =
+                    $validated['metode_pembayaran'] ?? 'tunai';
             }
 
             if (Schema::hasColumn('pesanan', 'status_pembayaran')) {
@@ -110,23 +169,32 @@ class PesananController extends Controller
             $totalHarga = 0;
 
             foreach ($validated['items'] as $item) {
-                // Harga SELALU dari database, bukan dari request client.
+
+                // Mengambil harga produk dari database.
                 $produk = Produk::findOrFail($item['id_produk']);
 
-                $stok = Stok::where('id_produk', $produk->id_produk)
+                // Mengunci stok selama transaksi.
+                $stok = Stok::where(
+                    'id_produk',
+                    $produk->id_produk
+                )
                     ->lockForUpdate()
                     ->first();
 
-                if (! $stok || $stok->jumlah_stok < $item['jumlah']) {
+                if (!$stok || $stok->jumlah_stok < $item['jumlah']) {
                     throw ValidationException::withMessages([
-                        'items' => ["Stok untuk {$produk->nama_produk} tidak mencukupi."],
+                        'items' => [
+                            "Stok untuk {$produk->nama_produk} tidak mencukupi.",
+                        ],
                     ]);
                 }
 
+                // Mengurangi stok.
                 $stok->decrement('jumlah_stok', $item['jumlah']);
 
                 $harga = (float) $produk->harga;
                 $subtotal = $harga * $item['jumlah'];
+
                 $totalHarga += $subtotal;
 
                 $detailData = [
@@ -148,29 +216,38 @@ class PesananController extends Controller
                 DetailPesanan::create($detailData);
             }
 
-            $pesanan->update(['total_harga' => $totalHarga]);
+            // Memperbarui total harga.
+            $pesanan->update([
+                'total_harga' => $totalHarga,
+            ]);
+
+            // Dine-in menandai meja terisi; takeaway selalu tetap tersedia.
+            $this->syncMejaStatus($pesanan);
 
             return $pesanan;
         });
     }
 
     /**
-     * Customer wajib mengunggah bukti transfer QRIS agar pesanan diteruskan ke kasir.
+     * Konfirmasi pembayaran QRIS.
      */
-    public function konfirmasiQris(Request $request, Pesanan $pesanan): JsonResponse
-    {
+    public function konfirmasiQris(
+        Request $request,
+        Pesanan $pesanan
+    ): JsonResponse {
         $this->authorizeAccess($request, $pesanan);
 
         $request->validate([
-            'bukti_bayar' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
-        ], [
-            'bukti_bayar.required' => 'Wajib unggah foto/screenshot bukti pembayaran QRIS terlebih dahulu.',
-            'bukti_bayar.image' => 'File bukti pembayaran harus berupa gambar.',
-            'bukti_bayar.mimes' => 'Format gambar bukti pembayaran harus JPG, JPEG, PNG, atau WEBP.',
-            'bukti_bayar.max' => 'Ukuran file bukti pembayaran maksimal 5 MB.',
+            'bukti_bayar' => [
+                'required',
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:5120',
+            ],
         ]);
 
-        $path = $request->file('bukti_bayar')->store('bukti-qris', 'public');
+        $path = $request->file('bukti_bayar')
+            ->store('bukti-qris', 'public');
 
         $updates = [];
 
@@ -186,21 +263,30 @@ class PesananController extends Controller
             $updates['bukti_bayar'] = $path;
         }
 
-        if (! empty($updates)) {
+        if (!empty($updates)) {
             $pesanan->update($updates);
         }
 
         return response()->json([
             'message' => 'Bukti pembayaran QRIS berhasil dikirim. Menunggu verifikasi kasir.',
-            'data' => new PesananResource($pesanan->fresh(['meja', 'detailPesanan.produk'])),
+            'data' => new PesananResource(
+                $pesanan->fresh([
+                    'meja',
+                    'detailPesanan.produk',
+                ])
+            ),
         ]);
     }
 
     /**
-     * Kasir menolak bukti pembayaran QRIS yang tidak valid.
+     * Menolak bukti pembayaran QRIS.
      */
-    public function tolakQris(Pesanan $pesanan): JsonResponse
-    {
+    public function tolakQris(
+        Request $request,
+        Pesanan $pesanan
+    ): JsonResponse {
+        $this->authorizeStaff($request);
+
         if (Schema::hasColumn('pesanan', 'status_pembayaran')) {
             $pesanan->update([
                 'status_pembayaran' => 'ditolak',
@@ -209,14 +295,34 @@ class PesananController extends Controller
 
         return response()->json([
             'message' => 'Bukti pembayaran QRIS ditolak. Pelanggan diminta mengunggah ulang.',
-            'data' => new PesananResource($pesanan->fresh(['meja', 'detailPesanan.produk'])),
+            'data' => new PesananResource(
+                $pesanan->fresh([
+                    'meja',
+                    'detailPesanan.produk',
+                ])
+            ),
         ]);
     }
 
-    public function update_status(Request $request, Pesanan $pesanan): PesananResource
-    {
+    /**
+     * Mengubah status pesanan.
+     */
+    public function update_status(
+        Request $request,
+        Pesanan $pesanan
+    ): PesananResource {
+        $this->authorizeStaff($request);
+
         $validated = $request->validate([
-            'status_pesanan' => ['required', Rule::in(['menunggu', 'diproses', 'selesai', 'batal'])],
+            'status_pesanan' => [
+                'required',
+                Rule::in([
+                    'menunggu',
+                    'diproses',
+                    'selesai',
+                    'batal',
+                ]),
+            ],
         ]);
 
         $statusBaru = $validated['status_pesanan'];
@@ -224,36 +330,87 @@ class PesananController extends Controller
 
         if ($statusLama === 'selesai' && $statusBaru !== 'selesai') {
             throw ValidationException::withMessages([
-                'status_pesanan' => ['Pesanan yang sudah dibayar tidak dapat diubah atau dibatalkan. Batalkan pembayarannya terlebih dahulu.'],
+                'status_pesanan' => [
+                    'Pesanan yang sudah selesai tidak dapat diubah atau dibatalkan.',
+                ],
             ]);
         }
 
         if ($statusLama === 'batal' && $statusBaru !== 'batal') {
             throw ValidationException::withMessages([
-                'status_pesanan' => ['Pesanan yang sudah dibatalkan tidak dapat diubah.'],
+                'status_pesanan' => [
+                    'Pesanan yang sudah dibatalkan tidak dapat diubah.',
+                ],
             ]);
         }
 
-        DB::transaction(function () use ($pesanan, $statusBaru, $statusLama) {
-            if ($statusBaru === 'batal' && $statusLama !== 'batal') {
+        DB::transaction(function () use (
+            $pesanan,
+            $statusBaru,
+            $statusLama
+        ) {
+            $pesanan = Pesanan::where(
+                'id_pesanan',
+                $pesanan->id_pesanan
+            )
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($pesanan->status_pesanan !== $statusLama) {
+                throw ValidationException::withMessages([
+                    'status_pesanan' => [
+                        'Status pesanan sudah berubah. Silakan muat ulang.',
+                    ],
+                ]);
+            }
+
+            if (
+                $statusBaru === 'batal' &&
+                $pesanan->status_pesanan !== 'batal'
+            ) {
                 $this->kembalikanStok($pesanan);
             }
 
-            $pesanan->update(['status_pesanan' => $statusBaru]);
+            $pesanan->update([
+                'status_pesanan' => $statusBaru,
+            ]);
+
+            // Lepas meja dine-in bila tidak ada lagi pesanan aktif.
+            $this->syncMejaStatus($pesanan);
         });
 
-        return new PesananResource($pesanan->load(['meja', 'detailPesanan.produk']));
+        return new PesananResource(
+            $pesanan->fresh([
+                'meja',
+                'detailPesanan.produk',
+            ])
+        );
     }
 
-    public function destroy(Pesanan $pesanan): JsonResponse
-    {
-        if ($pesanan->status_pesanan === 'selesai') {
-            return response()->json([
-                'message' => 'Pesanan yang sudah dibayar tidak dapat dibatalkan atau dihapus.',
-            ], 409);
-        }
+    /**
+     * Membatalkan atau menghapus pesanan.
+     */
+    public function destroy(
+        Request $request,
+        Pesanan $pesanan
+    ): JsonResponse {
+        $this->authorizeStaff($request);
 
-        DB::transaction(function () use ($pesanan) {
+        return DB::transaction(function () use ($pesanan) {
+
+            $pesanan = Pesanan::where(
+                'id_pesanan',
+                $pesanan->id_pesanan
+            )
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($pesanan->status_pesanan === 'selesai') {
+                return response()->json([
+                    'message' => 'Pesanan yang sudah selesai tidak dapat dibatalkan atau dihapus.',
+                ], 409);
+            }
+
             if ($pesanan->status_pesanan !== 'batal') {
                 $this->kembalikanStok($pesanan);
 
@@ -261,33 +418,57 @@ class PesananController extends Controller
                     'status_pesanan' => 'batal',
                 ]);
 
-                return;
+                $this->syncMejaStatus($pesanan);
+
+                return response()->json([
+                    'message' => 'Pesanan berhasil dibatalkan.',
+                ]);
             }
 
             $pesanan->detailPesanan()->delete();
             $pesanan->delete();
-        });
 
-        return response()->json([
-            'message' => 'Pesanan berhasil dibatalkan/dihapus.',
-        ]);
+            $this->syncMejaStatus($pesanan);
+
+            return response()->json([
+                'message' => 'Pesanan berhasil dihapus.',
+            ]);
+        });
     }
 
-    public function cetakStruk(Request $request, $id): JsonResponse
-    {
-        $pesanan = Pesanan::with(['meja', 'detailPesanan.produk', 'pembayaran'])
-            ->findOrFail($id);
+    /**
+     * Membuat data struk pesanan.
+     */
+    public function cetakStruk(
+        Request $request,
+        $id
+    ): JsonResponse {
+        $pesanan = Pesanan::with([
+            'meja',
+            'detailPesanan.produk',
+            'pembayaran',
+        ])->findOrFail($id);
 
         $this->authorizeAccess($request, $pesanan);
 
         $resource = (new PesananResource($pesanan))->resolve();
 
-        $items = [];
-        if (isset($resource['detail_pesanan'])) {
-            $items = $resource['detail_pesanan'];
-        } elseif (isset($resource['items'])) {
-            $items = $resource['items'];
-        }
+        $items = $resource['detail_pesanan']
+            ?? $resource['items']
+            ?? [];
+
+        $pembayaran = $pesanan->pembayaran;
+
+        $metodePembayaran =
+            $resource['pembayaran']['metode_pembayaran']
+            ?? $pembayaran?->metodePembayaran?->nama_metode
+            ?? $pesanan->metode_pembayaran
+            ?? null;
+
+        $kembalian =
+            $resource['pembayaran']['kembalian']
+            ?? $pembayaran?->kembalian
+            ?? null;
 
         return response()->json([
             'status' => 'success',
@@ -297,44 +478,106 @@ class PesananController extends Controller
                     'alamat' => '-',
                     'telepon' => '-',
                 ],
-                'nomor_antrean' => $resource['nomor_antrean'] ?? $pesanan->nomor_antrean,
+
+                'nomor_antrean' =>
+                    $resource['nomor_antrean']
+                    ?? $pesanan->nomor_antrean,
+
                 'nama_pemesan' => $pesanan->nama_pemesan,
-                'nama_meja' => $resource['meja']['no_meja'] ?? null,
+
+                'tipe_pesanan' =>
+                    $resource['tipe_pesanan']
+                    ?? $pesanan->tipe_pesanan
+                    ?? 'dine_in',
+
+                'nama_meja' =>
+                    $resource['meja']['no_meja'] ?? null,
+
                 'meja' => $resource['meja'] ?? null,
+
                 'daftar_item' => $items,
                 'items' => $items,
-                'total_harga' => $resource['total_harga'] ?? (float) $pesanan->total_harga,
-                'metode_pembayaran' => $resource['pembayaran']['metode_pembayaran'] ?? $pesanan->pembayaran->metodePembayaran->nama_metode ?? null,
-                'kembalian' => $resource['pembayaran']['kembalian'] ?? $pesanan->pembayaran->kembalian ?? null,
-                'tanggal' => $resource['tanggal_pesan'] ?? $pesanan->tanggal_pesan,
-                'tanggal_pesan' => $resource['tanggal_pesan'] ?? $pesanan->tanggal_pesan,
+
+                'total_harga' =>
+                    $resource['total_harga']
+                    ?? (float) $pesanan->total_harga,
+
+                'metode_pembayaran' => $metodePembayaran,
+                'kembalian' => $kembalian,
+
+                'tanggal' =>
+                    $resource['tanggal_pesan']
+                    ?? $pesanan->tanggal_pesan,
+
+                'tanggal_pesan' =>
+                    $resource['tanggal_pesan']
+                    ?? $pesanan->tanggal_pesan,
+
                 'pembayaran' => $resource['pembayaran'] ?? null,
             ],
         ]);
     }
 
-    private function authorizeAccess(Request $request, Pesanan $pesanan): void
+    /**
+     * Memeriksa akses staff.
+     */
+    private function authorizeStaff(Request $request): void
     {
         $user = $request->user('sanctum');
 
-        if ($user && in_array($user->role, ['admin', 'kasir', 'manager'], true)) {
+        abort_unless(
+            $user && in_array(
+                $user->role,
+                ['admin', 'kasir', 'manager'],
+                true
+            ),
+            403
+        );
+    }
+
+    /**
+     * Memeriksa hak akses pelanggan terhadap pesanan.
+     */
+    private function authorizeAccess(
+        Request $request,
+        Pesanan $pesanan
+    ): void {
+        $user = $request->user('sanctum');
+
+        if (
+            $user &&
+            in_array($user->role, ['admin', 'kasir', 'manager'], true)
+        ) {
             return;
         }
 
         $kode = $request->query('kode');
 
-        if (! is_string($kode) || $kode === '' || ! is_string($pesanan->kode_akses)
-            || ! hash_equals($pesanan->kode_akses, $kode)) {
+        if (
+            !is_string($kode) ||
+            $kode === '' ||
+            !is_string($pesanan->kode_akses) ||
+            !hash_equals($pesanan->kode_akses, $kode)
+        ) {
             abort(404);
         }
     }
 
+    /**
+     * Mengembalikan stok ketika pesanan dibatalkan.
+     */
     private function kembalikanStok(Pesanan $pesanan): void
     {
         $pesanan->loadMissing('detailPesanan');
 
         foreach ($pesanan->detailPesanan as $detail) {
-            $stok = Stok::where('id_produk', $detail->id_produk)->lockForUpdate()->first();
+
+            $stok = Stok::where(
+                'id_produk',
+                $detail->id_produk
+            )
+                ->lockForUpdate()
+                ->first();
 
             if ($stok) {
                 $stok->increment('jumlah_stok', $detail->jumlah);
@@ -342,16 +585,75 @@ class PesananController extends Controller
         }
     }
 
+    /**
+     * Menyelaraskan status meja dengan pesanan aktif.
+     * Meja takeaway tidak pernah berstatus "terisi".
+     */
+    private function syncMejaStatus(Pesanan $pesanan): void
+    {
+        $meja = Meja::find($pesanan->id_meja);
+
+        if (! $meja) {
+            return;
+        }
+
+        if ($meja->isTakeaway() || $pesanan->isTakeaway()) {
+            $meja->ensureAvailableIfTakeaway();
+
+            return;
+        }
+
+        $adaPesananAktif = Pesanan::where('id_meja', $meja->id_meja)
+            ->whereIn('status_pesanan', ['menunggu', 'diproses'])
+            ->exists();
+
+        $status = $adaPesananAktif ? 'terisi' : 'tersedia';
+
+        if ($meja->status !== $status) {
+            $meja->update(['status' => $status]);
+        }
+    }
+
+    /**
+     * Menentukan tipe pesanan dari meja atau input pelanggan.
+     */
+    private function resolveTipePesanan(array $validated): string
+    {
+        $meja = Meja::find($validated['id_meja'] ?? null);
+
+        if ($meja && $meja->isTakeaway()) {
+            return 'takeaway';
+        }
+
+        return $validated['tipe_pesanan'] ?? 'dine_in';
+    }
+
+    /**
+     * Membuat nomor antrean otomatis.
+     */
     private function generateNomorAntrean(): string
     {
-        $prefix = 'ORD-'.Carbon::now()->format('Ymd').'-';
+        $prefix = 'ORD-' . Carbon::now()->format('Ymd') . '-';
 
-        $terakhir = Pesanan::where('nomor_antrean', 'like', $prefix.'%')
-            ->orderByRaw("CAST(SUBSTRING_INDEX(nomor_antrean, '-', -1) AS UNSIGNED) DESC")
+        // Urutkan berdasarkan id (portable MySQL & SQLite), lalu ambil
+        // nomor urut terakhir dari format ORD-YYYYMMDD-XXX.
+        $terakhir = Pesanan::where(
+            'nomor_antrean',
+            'like',
+            $prefix . '%'
+        )
+            ->orderByDesc('id_pesanan')
             ->value('nomor_antrean');
 
-        $berikutnya = $terakhir ? ((int) Str::afterLast($terakhir, '-')) + 1 : 1;
+        $berikutnya = $terakhir
+            ? ((int) Str::afterLast($terakhir, '-')) + 1
+            : 1;
 
-        return $prefix.str_pad((string) $berikutnya, 3, '0', STR_PAD_LEFT);
+        return $prefix . str_pad(
+            (string) $berikutnya,
+            3,
+            '0',
+            STR_PAD_LEFT
+        );
     }
 }

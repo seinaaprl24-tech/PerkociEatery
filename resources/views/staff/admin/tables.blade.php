@@ -26,15 +26,15 @@
 
     <div class="mt-5 grid gap-3 sm:grid-cols-3">
         <x-ui.stat-card data-stat="total" label="Total Meja" value="0" icon="table_restaurant" tone="brand"
-            hint="terdaftar di sistem" />
+            hint="termasuk takeaway" />
         <x-ui.stat-card data-stat="terisi" label="Terisi" value="0" icon="groups" tone="lime"
-            hint="punya pesanan aktif" />
+            hint="meja dine-in aktif" />
         <x-ui.stat-card data-stat="kosong" label="Kosong" value="0" icon="event_seat" tone="butter"
-            hint="siap dipakai" />
+            hint="meja dine-in siap dipakai" />
     </div>
 
     <x-ui.section class="mt-4" :title="$role['tables']['title']"
-        description="Ikon QR menampilkan kode QR untuk ditempel di meja. Meja yang sudah punya riwayat pesanan tidak bisa dihapus.">
+        description="Ikon QR menampilkan kode QR untuk ditempel di meja. Meja takeaway selalu tersedia; meja yang sudah punya riwayat pesanan tidak bisa dihapus.">
         <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3" data-tables></div>
 
         <div data-tables-empty class="hidden">
@@ -185,21 +185,24 @@
             }
 
             function card(table) {
-                var occupied = !!occupiedIds[table.id_meja];
-                var styles = occupied
-                    ? 'border-brand/20 bg-brand/10 text-brand'
-                    : 'border-cocoa/10 bg-white text-cocoa/45';
+                var isTakeaway = Admin.isTakeawayTable(table);
+                var occupied = Admin.isTableOccupied(table, occupiedIds);
+                var styles = isTakeaway
+                    ? 'border-butter bg-butter/20 text-cocoa'
+                    : (occupied
+                        ? 'border-brand/20 bg-brand/10 text-brand'
+                        : 'border-cocoa/10 bg-white text-cocoa/45');
 
                 var item = Admin.make('div', 'flex items-center gap-2 rounded-xl border px-3 py-3 ' + styles);
 
                 item.appendChild(Admin.make('span',
                     'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/70 font-display text-xs font-bold',
-                    table.no_meja));
+                    isTakeaway ? 'TA' : table.no_meja));
 
                 var info = Admin.make('div', 'min-w-0 flex-1');
-                info.appendChild(Admin.make('p', 'truncate text-xs font-bold', 'Meja ' + table.no_meja));
+                info.appendChild(Admin.make('p', 'truncate text-xs font-bold', Admin.tableName(table)));
                 info.appendChild(Admin.make('p', 'mt-0.5 truncate text-[10px] opacity-70',
-                    (occupied ? 'Terisi' : 'Kosong') + ' · ' + table.qr_code));
+                    (isTakeaway ? 'Selalu tersedia' : (occupied ? 'Terisi' : 'Kosong')) + ' · ' + table.qr_code));
                 item.appendChild(info);
 
                 item.appendChild(Admin.iconButton('qr_code_2', 'btn-icon h-8 w-8', 'Lihat QR Meja ' + table.no_meja, function () {
@@ -217,13 +220,17 @@
             }
 
             function render() {
-                var occupied = tables.filter(function (table) {
-                    return occupiedIds[table.id_meja];
+                var physicalTables = tables.filter(function (table) {
+                    return !Admin.isTakeawayTable(table);
+                });
+
+                var occupied = physicalTables.filter(function (table) {
+                    return Admin.isTableOccupied(table, occupiedIds);
                 }).length;
 
                 Admin.setStat('total', tables.length);
                 Admin.setStat('terisi', occupied);
-                Admin.setStat('kosong', tables.length - occupied);
+                Admin.setStat('kosong', physicalTables.length - occupied);
 
                 Admin.clear(gridEl);
                 tables.forEach(function (table) {
