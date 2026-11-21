@@ -283,13 +283,16 @@
                     }
                 }
 
+                var tipePesanan = d.tipe_pesanan === 'takeaway' || d.is_takeaway ? 'takeaway' : 'dine_in';
+
                 var detail = d.detail_pesanan || d.items || [];
 
                 return {
                     id: d.id_pesanan || d.id || '-',
                     nomor_antrean: d.nomor_antrean || '---',
                     nama_pemesan: d.nama_pemesan || '-',
-                    meja: namaMeja,
+                    tipe_pesanan: tipePesanan,
+                    meja: tipePesanan === 'takeaway' ? 'Takeaway (Bungkus)' : namaMeja,
                     metode_pembayaran: d.metode_pembayaran || 'tunai',
                     status_pembayaran: d.status_pembayaran || 'belum_bayar',
                     status: d.status_pesanan === 'batal' ? 'dibatalkan' : d.status_pesanan,

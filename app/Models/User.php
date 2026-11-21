@@ -17,6 +17,12 @@ class User extends Authenticatable
      */
     public const AUTH_CREDENTIAL_FIELD = 'username';
 
+    /**
+     * Role staf yang sah. Dipakai untuk validasi login, pembuatan user,
+     * dan pengecekan akses.
+     */
+    public const ROLES = ['kasir', 'admin', 'manager'];
+
     protected $primaryKey = 'id_user';
 
     public $incrementing = true;

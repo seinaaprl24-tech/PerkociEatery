@@ -1,0 +1,36 @@
+# Version control & CI
+.git
+.gitignore
+.gitattributes
+.github
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Dependency & build output (dibangun ulang di dalam image)
+node_modules
+vendor
+public/build
+public/hot
+public/storage
+
+# Cache, log, dan upload lokal
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/testing/*
+storage/framework/views/*
+storage/app/public/*
+storage/app/private/*
+bootstrap/cache/*
+
+# Berkas pengembangan yang tidak dibutuhkan saat runtime
+tests
+phpunit.xml
+.phpunit.result.cache
+*.drawio
+docs
+README.md
+compose.yaml

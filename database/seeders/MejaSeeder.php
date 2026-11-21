@@ -24,5 +24,14 @@ class MejaSeeder extends Seeder
                 ],
             );
         }
+
+        // Meja virtual untuk pesanan takeaway yang dipesan lewat QR kasir.
+        Meja::updateOrCreate(
+            ['qr_code' => Meja::TAKEAWAY_QR_CODE],
+            [
+                'no_meja' => Meja::TAKEAWAY_NAME,
+                'status' => 'tersedia',
+            ],
+        );
     }
 }

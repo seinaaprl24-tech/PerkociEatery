@@ -187,7 +187,11 @@
                 {{-- 1. Nomor pesanan + lencana status --}}
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <h2 class="min-w-0 break-words font-display text-[28px] font-bold leading-tight text-cocoa" data-sum-number>-</h2>
-                    <span class="badge badge-butter shrink-0 whitespace-nowrap" data-sum-status>Menunggu Pembayaran</span>
+
+                    <div class="flex shrink-0 items-center gap-2">
+                        <span class="badge badge-butter hidden" data-sum-takeaway>[TAKEAWAY]</span>
+                        <span class="badge badge-butter shrink-0 whitespace-nowrap" data-sum-status>Menunggu Pembayaran</span>
+                    </div>
                 </div>
 
                 {{-- 2. Meja • nama pemesan --}}
@@ -335,6 +339,10 @@
                                 <dt class="shrink-0 text-cocoa/60">Meja</dt>
                                 <dd class="min-w-0 text-right" data-receipt-table>-</dd>
                             </div>
+                            <div class="flex items-start justify-between gap-2">
+                                <dt class="shrink-0 text-cocoa/60">Tipe</dt>
+                                <dd class="min-w-0 text-right" data-receipt-type>-</dd>
+                            </div>
                             <div class="hidden items-start justify-between gap-2" data-receipt-customer-row>
                                 <dt class="shrink-0 text-cocoa/60">Pemesan</dt>
                                 <dd class="min-w-0 break-words text-right" data-receipt-customer>-</dd>
@@ -457,6 +465,7 @@
             var summaryEl = q('[data-summary]');
             var summaryEmpty = q('[data-summary-empty]');
             var sumStatus = q('[data-sum-status]');
+            var sumTakeaway = q('[data-sum-takeaway]');
             var sumCustomer = q('[data-sum-customer]');
             var sumLines = q('[data-sum-lines]');
             var sumSubtotal = q('[data-sum-subtotal]');
@@ -468,6 +477,7 @@
             var receiptOrder = q('[data-receipt-order]');
             var receiptDatetime = q('[data-receipt-datetime]');
             var receiptTable = q('[data-receipt-table]');
+            var receiptType = q('[data-receipt-type]');
             var receiptCustomerRow = q('[data-receipt-customer-row]');
             var receiptCustomer = q('[data-receipt-customer]');
             var receiptItems = q('[data-receipt-items]');
@@ -695,6 +705,7 @@
                 receiptOrder.textContent = order.nomor_antrean || '-';
                 receiptDatetime.textContent = formatDateTime(order.tanggal_pesan);
                 receiptTable.textContent = Kasir.tableLabel(order);
+                receiptType.textContent = Kasir.isTakeaway(order) ? 'Takeaway (Bungkus)' : 'Dine In';
 
                 receiptCustomerRow.classList.toggle('hidden', !customer);
                 receiptCustomerRow.classList.toggle('flex', !!customer);
@@ -804,6 +815,7 @@
 
                     q('[data-sum-number]').textContent = order.nomor_antrean;
                     q('[data-sum-table]').textContent = Kasir.tableLabel(order);
+                    sumTakeaway.classList.toggle('hidden', !Kasir.isTakeaway(order));
                     sumCustomer.textContent = customer ? ' • ' + customer : '';
                     q('[data-sum-items]').textContent = Kasir.itemCount(order) + ' item';
                     sumSubtotal.textContent = Kasir.rupiah(subtotalOf(order));
@@ -871,6 +883,7 @@
                     var qrisTag = isQrisClaimed(order)
                         ? ' · QRIS (Bukti Terkirim)'
                         : (isQrisOrder(order) ? ' · QRIS' : '');
+                    var takeawayTag = Kasir.isTakeaway(order) ? ' · [TAKEAWAY]' : '';
 
                     var item = Kasir.make('li');
                     var pick = Kasir.make('button',
@@ -881,7 +894,8 @@
                     var left = Kasir.make('div', 'min-w-0');
                     left.appendChild(Kasir.make('p', 'text-xs font-bold text-cocoa',
                         order.nomor_antrean + ' · ' + Kasir.tableLabel(order)
-                        + (Kasir.customer(order) ? ' · ' + Kasir.customer(order) : '') + qrisTag));
+                        + (Kasir.customer(order) ? ' · ' + Kasir.customer(order) : '')
+                        + takeawayTag + qrisTag));
                     left.appendChild(Kasir.make('p', 'mt-0.5 text-[11px] text-cocoa/45',
                         Kasir.itemCount(order) + ' item · ' + Kasir.ago(order.tanggal_pesan)));
                     pick.appendChild(left);

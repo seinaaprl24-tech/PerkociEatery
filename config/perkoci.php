@@ -38,6 +38,9 @@ return [
         'connected_note' => 'Terhubung otomatis via QR Meja',
         'locked_pill' => 'Terkunci Otomatis via QR',
         'locked_desc' => 'Pesanan kamu terikat otomatis ke meja ini. Barista akan membawa pesanan langsung ke meja tanpa perlu nomor antrean.',
+        'is_takeaway' => false,
+        'takeaway_pill' => 'Mode: Takeaway (Bungkus)',
+        'takeaway_desc' => 'Pesanan akan dibungkus dan disiapkan untuk diambil di kasir. Kamu tidak perlu menunggu di meja.',
         'order_mode' => 'Dine In',
     ],
 

@@ -154,7 +154,38 @@
         }
 
         function tableLabel(order) {
+            if (order && (String(order.tipe_pesanan || '').toLowerCase() === 'takeaway' || order.is_takeaway === true)) {
+                return 'Takeaway';
+            }
+
             return order.meja && order.meja.no_meja ? 'Meja ' + order.meja.no_meja : 'Meja -';
+        }
+
+        /* Meja virtual takeaway tidak pernah dihitung sebagai meja terisi. */
+        function isTakeawayTable(table) {
+            return !!table && (
+                table.is_takeaway === true
+                || String(table.qr_code || '').toUpperCase() === 'TAKEAWAY-KASIR'
+                || String(table.no_meja || '').toLowerCase().indexOf('takeaway') !== -1
+            );
+        }
+
+        function isTableOccupied(table, occupiedIds) {
+            return !isTakeawayTable(table)
+                && !!occupiedIds
+                && !!occupiedIds[table.id_meja];
+        }
+
+        function tableStateLabel(table, occupied) {
+            if (isTakeawayTable(table)) {
+                return 'Takeaway';
+            }
+
+            return occupied ? 'Terisi' : 'Kosong';
+        }
+
+        function tableName(table) {
+            return isTakeawayTable(table) ? 'Takeaway Kasir' : 'Meja ' + table.no_meja;
         }
 
         function ago(iso) {
@@ -208,6 +239,10 @@
             closeOnBackdrop: closeOnBackdrop,
             statusMeta: statusMeta,
             tableLabel: tableLabel,
+            isTakeawayTable: isTakeawayTable,
+            isTableOccupied: isTableOccupied,
+            tableStateLabel: tableStateLabel,
+            tableName: tableName,
             ago: ago,
             dateLabel: dateLabel
         };

@@ -1,0 +1,55 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: perkoci-app:latest
+    container_name: perkoci_app
+    restart: unless-stopped
+    working_dir: /var/www/html
+    env_file:
+      - .env
+    volumes:
+      - ./:/var/www/html
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+    networks:
+      - perkoci-network
+
+  webserver:
+    image: nginx:alpine
+    container_name: perkoci_nginx
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    volumes:
+      - ./:/var/www/html
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d
+    depends_on:
+      - app
+    networks:
+      - perkoci-network
+
+  mysql:
+    image: mysql:8.0
+    container_name: perkoci_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: klikkopi_perkoci
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - perkoci-network
+
+volumes:
+  mysql_data:
+
+networks:
+  perkoci-network:
+    driver: bridge
